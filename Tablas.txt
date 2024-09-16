@@ -1,0 +1,209 @@
+//Tener instalado instant-client para poder conectarnos de python a oracle (La version que tengan de Oracle)
+
+//Instalar cx_Oracle en la terminal: pip install cx_Oracle (Si da errores, deben instalar microsoft c++ build tools)
+//otra opcion es: pip install oracledb (Esta no la he probado)
+
+//Crear las siguientes tablas (Ejecutar los bloques de codigo SQL uno por uno, Los inserts si pueden ejecutarlos todos de una
+//Si los seleccionan todos en el Sql_Developer)
+
+
+CREATE TABLE Sucursal (
+    codigo VARCHAR2(10) PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL,
+    departamento VARCHAR2(100) NOT NULL,
+    municipio VARCHAR2(100) NOT NULL,
+    director VARCHAR2(100),
+    presupuesto NUMBER(15, 2) NOT NULL
+);
+
+-- Insertar datos de ejemplo
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('001', 'Sucursal Centro', 'Quindío', 'Armenia', 'Laura González', 15000000);
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('002', 'Sucursal Norte', 'Quindío', 'Armenia', 'Carlos Pérez', 20000000);
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('003', 'Sucursal Sur', 'Quindío', 'Calarcá', 'María Rodríguez', 18000000);
+
+CREATE TABLE Empleado (
+    id_empleado NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL,
+    apellido VARCHAR2(100) NOT NULL,
+    sucursal_codigo VARCHAR2(10) REFERENCES Sucursal(codigo),
+    puesto VARCHAR2(100) NOT NULL,
+    salario NUMBER(10, 2) NOT NULL
+);
+
+-- Insertar datos de ejemplo
+INSERT INTO Empleado (id_empleado, nombre, apellido, sucursal_codigo, puesto, salario) VALUES (1, 'Juan', 'Ramírez', '001', 'OPERARIO', 2500000);
+INSERT INTO Empleado (id_empleado, nombre, apellido, sucursal_codigo, puesto, salario) VALUES (2, 'Ana', 'Martínez', '002', 'ADMINISTRATIVO', 3500000);
+INSERT INTO Empleado (id_empleado, nombre, apellido, sucursal_codigo, puesto, salario) VALUES (3, 'Pedro', 'López', '003', 'EJECUTIVO', 2800000);
+
+//CREAR TABLA SolicitudPrestamo
+
+CREATE SEQUENCE seq_solicitudprestamo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+
+CREATE TABLE SolicitudPrestamo (
+    id NUMBER PRIMARY KEY,
+    id_empleado NUMBER REFERENCES Empleado(id_empleado),
+    monto NUMBER NOT NULL,
+	periodo NUMBER NOT NULL,
+	interes NUMBER(15,2) NOT NULL,
+    fecha_solicitud TIMESTAMP NOT NULL,
+    estado VARCHAR2(50) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_solicitudprestamo
+BEFORE INSERT ON SolicitudPrestamo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_solicitudprestamo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+-- Solicitud 1
+INSERT INTO SolicitudPrestamo (id_empleado, monto, periodo, interes, fecha_solicitud, estado)
+VALUES (1, 5000000, 12, 5.5, TO_TIMESTAMP('2024-01-15 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'APROBADA');
+-- Solicitud 2
+INSERT INTO SolicitudPrestamo (id_empleado, monto, periodo, interes, fecha_solicitud, estado)
+VALUES (2, 10000000, 24, 6.0, TO_TIMESTAMP('2023-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'PENDIENTE');
+-- Solicitud 3
+INSERT INTO SolicitudPrestamo (id_empleado, monto, periodo, interes, fecha_solicitud, estado)
+VALUES (3, 7500000, 18, 4.5, TO_TIMESTAMP('2023-08-10 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'CANCELADA');
+-- Solicitud 4
+INSERT INTO SolicitudPrestamo (id_empleado, monto, periodo, interes, fecha_solicitud, estado)
+VALUES (3, 3000000, 6, 3.0, TO_TIMESTAMP('2024-03-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'NO_APROBADA');
+
+//CREAR TABLA Prestamo
+
+CREATE SEQUENCE seq_prestamo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE Prestamo (
+    id NUMBER PRIMARY KEY,
+    id_solicitud NUMBER REFERENCES SolicitudPrestamo(id),
+    fecha_aprobacion TIMESTAMP NOT NULL,
+	fecha_vencimiento TIMESTAMP NOT NULL,
+    saldo_pendiente NUMBER(15,2) NOT NULL,
+    estado_prestamo VARCHAR2(50) NOT NULL
+);
+
+//En la tabla colocar, la fecha de ultimo pago, el numero de pagos
+
+CREATE OR REPLACE TRIGGER trg_before_insert_prestamo
+BEFORE INSERT ON Prestamo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_prestamo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+-- Préstamo 1 (Activo)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, estado_prestamo)
+VALUES (1, TO_TIMESTAMP('2024-01-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 5000000, 'ACTIVO');
+
+-- Préstamo 2 (Cancelado)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, estado_prestamo)
+VALUES (2, TO_TIMESTAMP('2023-05-25 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 0, 'CANCELADO');
+
+-- Préstamo 3 (Pagado)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, estado_prestamo)
+VALUES (3, TO_TIMESTAMP('2023-08-15 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 7500000, 'PAGADO');
+
+-- Préstamo 4 (En Mora)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, estado_prestamo)
+VALUES (4, TO_TIMESTAMP('2024-03-05 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1500000, 'MORA');
+
+
+CREATE SEQUENCE seq_pago_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE Pago (
+    id NUMBER PRIMARY KEY,
+    id_prestamo NUMBER REFERENCES Prestamo(id),
+    monto_pagado NUMBER(15, 2) NOT NULL,
+    fecha_pago TIMESTAMP NOT NULL,
+	metodo_pago VARCHAR2(50) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_pago
+BEFORE INSERT ON Pago
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_pago_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+-- Pago 1 para Préstamo 1
+INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, metodo_pago)
+VALUES (1, 500000.00, TO_TIMESTAMP('2024-09-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'TRANSFERENCIA');
+
+-- Pago 2 para Préstamo 2
+INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, metodo_pago)
+VALUES (2, 1000000.00, TO_TIMESTAMP('2024-09-05 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'EFECTIVO');
+
+-- Pago 3 para Préstamo 1
+INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, metodo_pago)
+VALUES (1, 500000.00, TO_TIMESTAMP('2024-10-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 'PSE');
+
+
+//CRENAOD LA TABLA USUARIO
+
+CREATE TABLE Usuario (
+    id_empleado NUMBER REFERENCES Empleado(id_empleado) PRIMARY KEY,
+    nombre_usuario VARCHAR2(50) NOT NULL UNIQUE,
+	email VARCHAR2(50) NOT NULL,
+    contraseña VARCHAR2(100) NOT NULL,
+    rol VARCHAR2(50) NOT NULL
+);
+
+-- Insertar datos de ejemplo
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, rol) VALUES (1, 'ADMIN', 'admin@gmail.com', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'PRINCIPAL');
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, rol) VALUES (2, 'ANA', 'anam@gmail.com', 'e82827b00b2ca8620beb37f879778c082b292a52270390cff35b6fe3157f4e8b', 'TESORERIA');
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, rol) VALUES (3, 'PEDRO', 'pedror@gmail.com', '2702cb34ee041711b9df0c67a8d5c9de02110c80e3fc966ba8341456dbc9ef2b', 'EMPLEADO');
+
+//CONTRASEÑA DE 'ADMIN' = admin
+//CONTRASEÑA DE 'ANA' = ana123
+//CONTRASEÑA DE 'PEDRO' = pedro123
+
+
+//Tabla de Logs de Sesiones
+
+CREATE SEQUENCE seq_log_sesion_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE LogSesion (
+    id NUMBER PRIMARY KEY,
+    id_usuario NUMBER REFERENCES Usuario(id_empleado),
+    fecha TIMESTAMP NOT NULL,
+    tipo VARCHAR2(50) CHECK (tipo IN ('ENTRADA', 'SALIDA')) NOT NULL,
+    estado VARCHAR2(20) CHECK (estado IN ('EXITOSO', 'FALLIDO')) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_log_sesion
+BEFORE INSERT ON LogSesion
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_log_sesion_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO LogSesion (id_usuario, fecha, tipo, estado)
+VALUES (1, CAST(CURRENT_TIMESTAMP AS TIMESTAMP(0)), 'ENTRADA', 'EXITOSO');
+INSERT INTO LogSesion (id_usuario, fecha, tipo, estado)
+VALUES (2, CAST(CURRENT_TIMESTAMP AS TIMESTAMP(0)), 'SALIDA', 'FALLIDO');
+
