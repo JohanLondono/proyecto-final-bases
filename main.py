@@ -6,10 +6,11 @@ from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QAction, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QPushButton, QLineEdit, QFormLayout, QWidget,
-    QComboBox, QMessageBox, QHBoxLayout, QLabel, QDateEdit, QCheckBox
+    QComboBox, QMessageBox, QHBoxLayout, QLabel, QDateEdit, QCheckBox, 
+    QHeaderView
 )
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
-from PyQt5.QtCore import QDate, QDateTime
+from PyQt5.QtCore import QDate, QDateTime, Qt
 from datetime import timedelta
 from database import get_connection
 from dao import SucursalDAO
@@ -49,7 +50,7 @@ class LoginWindow(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Login")
-        self.setGeometry(300, 200, 300, 200)
+        self.setGeometry(500, 250, 300, 200)
 
         # Campos de login
         self.username_label = QLabel("Nombre de Usuario:")
@@ -119,6 +120,7 @@ class LoginWindow(QWidget):
 class BankApp(QMainWindow):
     def __init__(self, usuario: UsuarioDTO):
         super().__init__()
+        self.sub_windows = []  # Lista para almacenar ventanas superpuestas
         self.usuario = usuario
         self.connection = get_connection()
         self.sucursal_dao = SucursalDAO(self.connection)
@@ -130,7 +132,6 @@ class BankApp(QMainWindow):
         self.log_sesion_dao = LogSesionDAO(self.connection)
         
         self.setWindowTitle("Sistema de Gestión Bancaria")
-        self.setGeometry(100, 100, 1000, 600)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -139,7 +140,15 @@ class BankApp(QMainWindow):
         self.create_menu()
 
         QApplication.instance().aboutToQuit.connect(self.registrar_salida)
+        self.showMaximized()
+
     
+    def closeEvent(self, event):
+        # Cerrar todas las ventanas hijas cuando se cierra la ventana principal
+        for window in self.sub_windows:
+            window.close()
+        event.accept()  # Acepta el evento de cierre de la ventana principal
+
     def registrar_log(self, id_usuario, tipo, estado):
         fecha_actual = datetime.now()
         fecha_actual = fecha_actual.strftime('%d-%m-%Y %H:%M:%S')
@@ -326,6 +335,8 @@ class BankApp(QMainWindow):
         self.branch_table = QTableWidget()
         self.branch_table.setColumnCount(6)
         self.branch_table.setHorizontalHeaderLabels(["Código", "Nombre", "Departamento", "Municipio", "Director", "Presupuesto"])
+        self.branch_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.branch_table)
         self.branch_table.setColumnWidth(1, 150) 
 
@@ -344,8 +355,12 @@ class BankApp(QMainWindow):
     def open_new_branch_form(self):
         # Crear una nueva ventana para el formulario de sucursales
         self.branch_form_window = QWidget()
+        
+        self.sub_windows.append(self.branch_form_window)
+
+
         self.branch_form_window.setWindowTitle("Nueva Sucursal")
-        self.branch_form_window.setGeometry(100, 100, 400, 300)
+        self.branch_form_window.setGeometry(450, 200, 400, 300)
 
         form_layout = QFormLayout()
 
@@ -551,9 +566,10 @@ class BankApp(QMainWindow):
         self.employee_table = QTableWidget()
         self.employee_table.setColumnCount(6)
         self.employee_table.setHorizontalHeaderLabels(["ID", "Nombre", "Apellido", "Sucursal", "Puesto", "Salario"])
+        self.employee_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.employee_table)
-        self.employee_table.setColumnWidth(1, 100) 
-        self.employee_table.setColumnWidth(2, 150) 
+
 
 
         self.load_employees()
@@ -584,8 +600,10 @@ class BankApp(QMainWindow):
     def open_new_employee_form(self):
         # Crear una nueva ventana para el formulario de empleados
         self.employee_form_window = QWidget()
+        self.sub_windows.append(self.employee_form_window)
+
         self.employee_form_window.setWindowTitle("Nuevo Empleado")
-        self.employee_form_window.setGeometry(100, 100, 400, 300)
+        self.employee_form_window.setGeometry(450, 200, 400, 300)
 
         form_layout = QFormLayout()
 
@@ -792,12 +810,9 @@ class BankApp(QMainWindow):
         self.user_table = QTableWidget()
         self.user_table.setColumnCount(4)  # Actualizar el número de columnas
         self.user_table.setHorizontalHeaderLabels(["ID Empleado", "Nombre de Usuario", "Email", "Rol"])
-        self.layout.addWidget(self.user_table)
-        self.user_table.setColumnWidth(0, 80) 
-        self.user_table.setColumnWidth(1, 120) 
-        self.user_table.setColumnWidth(2, 170) 
-        self.user_table.setColumnWidth(3, 70) 
+        self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+        self.layout.addWidget(self.user_table)
 
         self.load_users()
 
@@ -823,8 +838,10 @@ class BankApp(QMainWindow):
 
     def open_new_user_form(self):
         self.user_form_window = QWidget()
+        self.sub_windows.append(self.user_form_window)
+
         self.user_form_window.setWindowTitle("Nuevo Usuario")
-        self.user_form_window.setGeometry(100, 100, 400, 350)  # Ajustar tamaño
+        self.user_form_window.setGeometry(450, 200, 400, 300)
 
         form_layout = QFormLayout()
 
@@ -1028,14 +1045,9 @@ class BankApp(QMainWindow):
         self.loan_request_table = QTableWidget()
         self.loan_request_table.setColumnCount(7)
         self.loan_request_table.setHorizontalHeaderLabels(["ID", "ID Empleado", "Monto", "Periodo", "Interés", "Fecha Solicitud", "Estado", "Fecha Vencimiento"])
+        self.loan_request_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.loan_request_table)
-        self.loan_request_table.setColumnWidth(0, 30) 
-        self.loan_request_table.setColumnWidth(1, 100) 
-        self.loan_request_table.setColumnWidth(2, 70) 
-        self.loan_request_table.setColumnWidth(3, 50) 
-        self.loan_request_table.setColumnWidth(4, 50) 
-        self.loan_request_table.setColumnWidth(5, 130) 
-        self.loan_request_table.setColumnWidth(6, 100) 
 
         self.load_loan_requests()
 
@@ -1216,14 +1228,9 @@ class BankApp(QMainWindow):
         self.loan_request_table = QTableWidget()
         self.loan_request_table.setColumnCount(7)
         self.loan_request_table.setHorizontalHeaderLabels(["ID", "ID Empleado", "Monto", "Periodo", "Interés", "Fecha Solicitud", "Estado", "Fecha Vencimiento"])
+        self.loan_request_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.loan_request_table)
-        self.loan_request_table.setColumnWidth(0, 30) 
-        self.loan_request_table.setColumnWidth(1, 100) 
-        self.loan_request_table.setColumnWidth(2, 70) 
-        self.loan_request_table.setColumnWidth(3, 50) 
-        self.loan_request_table.setColumnWidth(4, 50) 
-        self.loan_request_table.setColumnWidth(5, 130) 
-        self.loan_request_table.setColumnWidth(6, 100) 
 
         self.load_loan_requests_empleado()
 
@@ -1266,9 +1273,10 @@ class BankApp(QMainWindow):
 
     def open_new_loan_request_employee_form(self):
         self.loan_request_employee_form = QWidget()
+        self.sub_windows.append(self.loan_request_employee_form)
 
         self.loan_request_employee_form.setWindowTitle("Nueva Solicitud de Préstamo")
-        self.loan_request_employee_form.setGeometry(100, 100, 400, 300)
+        self.loan_request_employee_form.setGeometry(450, 200, 400, 200)
 
         form_layout = QFormLayout()
 
@@ -1398,17 +1406,10 @@ class BankApp(QMainWindow):
         self.loan_table = QTableWidget()
         self.loan_table.setColumnCount(10)
         self.loan_table.setHorizontalHeaderLabels(["ID", "ID Solicitud", "ID Empleado", "Fecha Ultimo Pago", "Saldo Pendiente", "Saldo Acumulado", "#Pagos", "Fecha Aceptacion", "Fecha Vencimiento", "Estado"])
+        self.loan_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.loan_table)
-        self.loan_table.setColumnWidth(0, 30)
-        self.loan_table.setColumnWidth(1, 80)
-        self.loan_table.setColumnWidth(2, 80)
-        self.loan_table.setColumnWidth(3, 130)
-        self.loan_table.setColumnWidth(4, 100)
-        self.loan_table.setColumnWidth(5, 100)
-        self.loan_table.setColumnWidth(6, 50)
-        self.loan_table.setColumnWidth(7, 130)
-        self.loan_table.setColumnWidth(8, 130)
-        self.loan_table.setColumnWidth(9, 90)
+
 
         self.load_loans()
 
@@ -1523,17 +1524,10 @@ class BankApp(QMainWindow):
         self.loan_table = QTableWidget()
         self.loan_table.setColumnCount(10)
         self.loan_table.setHorizontalHeaderLabels(["ID", "ID Solicitud", "ID Empleado", "Fecha Ultimo Pago", "Saldo Pendiente", "Saldo Acumulado", "#Pagos", "Fecha Aceptacion", "Fecha Vencimiento", "Estado"])
+        self.loan_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.loan_table)
-        self.loan_table.setColumnWidth(0, 30)
-        self.loan_table.setColumnWidth(1, 80)
-        self.loan_table.setColumnWidth(2, 80)
-        self.loan_table.setColumnWidth(3, 130)
-        self.loan_table.setColumnWidth(4, 100)
-        self.loan_table.setColumnWidth(5, 100)
-        self.loan_table.setColumnWidth(6, 50)
-        self.loan_table.setColumnWidth(7, 130)
-        self.loan_table.setColumnWidth(8, 130)
-        self.loan_table.setColumnWidth(9, 90)
+
 
         self.load_loans_empleado()
 
@@ -1672,8 +1666,10 @@ class BankApp(QMainWindow):
 
     def ventana_pago(self, id_prestamo, monto_total_a_pagar, pagos_pendientes, saldo_pendiente):
         self.ventana = QWidget()
+        self.sub_windows.append(self.ventana)
+
         self.ventana.setWindowTitle("Pago de Préstamo")
-        self.ventana.setGeometry(100, 100, 400, 300)
+        self.ventana.setGeometry(450, 200, 400, 300)
 
         layout = QVBoxLayout()
 
@@ -1861,15 +1857,11 @@ class BankApp(QMainWindow):
         self.loan_payment_table.setHorizontalHeaderLabels([
             "ID Pago", "ID Préstamo", "ID Empleado", "Monto Pagado", "Fecha de Pago", "Método de Pago"
         ])
+        self.loan_payment_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.loan_payment_table)
 
-        # Ajustar el tamaño de las columnas
-        self.loan_payment_table.setColumnWidth(0, 80)  # ID Pago
-        self.loan_payment_table.setColumnWidth(1, 100)  # ID Préstamo
-        self.loan_payment_table.setColumnWidth(2, 100)  # ID Empleado
-        self.loan_payment_table.setColumnWidth(3, 100)  # Monto Pagado
-        self.loan_payment_table.setColumnWidth(4, 150)  # Fecha de Pago
-        self.loan_payment_table.setColumnWidth(5, 120)  # Método de Pago
+
 
         # Cargar los registros de pagos en la tabla
         self.load_loan_payments()
@@ -1968,15 +1960,10 @@ class BankApp(QMainWindow):
         self.loan_payment_table.setHorizontalHeaderLabels([
             "ID Pago", "ID Préstamo", "ID Empleado", "Monto Pagado", "Fecha de Pago", "Método de Pago"
         ])
+        self.loan_payment_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.loan_payment_table)
 
-        # Ajustar el tamaño de las columnas
-        self.loan_payment_table.setColumnWidth(0, 80)  # ID Pago
-        self.loan_payment_table.setColumnWidth(1, 100)  # ID Préstamo
-        self.loan_payment_table.setColumnWidth(2, 100)  # ID Empleado
-        self.loan_payment_table.setColumnWidth(3, 100)  # Monto Pagado
-        self.loan_payment_table.setColumnWidth(4, 150)  # Fecha de Pago
-        self.loan_payment_table.setColumnWidth(5, 120)  # Método de Pago
 
         # Cargar los registros de pagos en la tabla
         self.load_loan_empleado_payments()
@@ -2082,17 +2069,10 @@ class BankApp(QMainWindow):
         self.log_table.setHorizontalHeaderLabels([
             "ID Log", "ID Usuario", "ID Empleado", "Nombre", "Apellido", "Fecha", "Tipo", "Estado"
         ])
+        self.log_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.layout.addWidget(self.log_table)
 
-        # Ajustar el tamaño de las columnas
-        self.log_table.setColumnWidth(0, 80) 
-        self.log_table.setColumnWidth(1, 80) 
-        self.log_table.setColumnWidth(2, 90) 
-        self.log_table.setColumnWidth(3, 100)  
-        self.log_table.setColumnWidth(4, 150) 
-        self.log_table.setColumnWidth(5, 150) 
-        self.log_table.setColumnWidth(6, 80) 
-        self.log_table.setColumnWidth(7, 80) 
 
         self.load_log_sessions()
 
@@ -2180,6 +2160,11 @@ class BankApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication([])
+        # Cargar la hoja de estilos CSS
+    with open("styles.css", "r") as f:
+        stylesheet = f.read()
+        app.setStyleSheet(stylesheet)
+        
     login_window = LoginWindow()
     login_window.show()  # Muestra la ventana de login
     app.exec_()       

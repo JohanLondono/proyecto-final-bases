@@ -67,6 +67,8 @@ class PagoDAO:
                 Prestamo pr ON p.id_prestamo = pr.id
             JOIN 
                 SolicitudPrestamo sp ON pr.id_solicitud = sp.id
+            ORDER BY
+                p.fecha_pago
             """
             cursor.execute(query)
             filas = cursor.fetchall()
@@ -99,6 +101,8 @@ class PagoDAO:
                 SolicitudPrestamo sp ON pr.id_solicitud = sp.id
             WHERE 
                 sp.id_empleado = :1
+            ORDER BY
+                p.fecha_pago
             """
             cursor.execute(query, (id_empleado,))
             filas = cursor.fetchall()

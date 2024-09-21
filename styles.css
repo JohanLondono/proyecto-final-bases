@@ -1,0 +1,86 @@
+QWidget {
+    background-color: #f0f8ff;
+    font-family: Arial, sans-serif;
+}
+
+/* ... (resto de tu código) */
+
+QTableWidget {
+    background-color: #e0f7fa;
+    gridline-color: #87cefa;
+    alternate-background-color: #b3e5fc;
+    color: #000000;
+}
+
+QTableWidget::item {
+    background-color: #B0E0E6; /* Color similar a "powderblue" */
+    color: black; /* Ajusta el color del texto según sea necesario */
+}
+
+QLineEdit, QComboBox, QDateEdit {
+    background-color: #ffffff; /* Fondo blanco para campos de entrada */
+    border: 1px solid #87cefa; /* Borde azul claro */
+    padding: 5px;
+    border-radius: 5px;
+}
+
+QComboBox {
+    background-color: #e0f7fa; /* Fondo azul claro para el ComboBox */
+    border: 1px solid #87cefa; /* Borde azul claro */
+    padding: 5px;
+    border-radius: 5px;
+    color: #4169e1; /* Texto azul royal */
+}
+
+QPushButton {
+    background-color: #4682b4; /* Azul acero */
+    color: white;
+    border: 1px solid #87cefa;
+    border-radius: 5px;
+    padding: 8px 16px;
+}
+
+QPushButton:hover {
+    background-color: #5a9bd5; /* Azul claro en hover */
+}
+
+QLabel {
+    color: #4169e1; /* Azul royal para los textos */
+}
+
+QTableWidget {
+    background-color: #e0f7fa; /* Color azul claro para tablas */
+    gridline-color: #87cefa; /* Línea azul */
+    alternate-background-color: #b3e5fc; /* Alternar filas */
+    color: #000000; /* Texto negro para mejor legibilidad */
+}
+
+QHeaderView::section {
+    background-color: #4682b4;
+    color: white;
+    padding: 5px;
+    border: none;
+}
+
+QMessageBox {
+    background-color: #f0f8ff;
+    border: 1px solid #87cefa;
+}
+
+QMenuBar {
+    background-color: #5a9bd5; /* Azul más oscuro para el menú */
+    color: black; /* Texto gris claro */
+}
+
+QMenuBar::item:selected {
+    background-color: #4682b4; /* Hover en el menú */
+}
+
+QMenu {
+    background-color: #f0f8ff;
+    border: 1px solid #87cefa;
+}
+
+QMenu::item:selected {
+    background-color: #5a9bd5; /* Hover en items de menú */
+}

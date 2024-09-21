@@ -1,0 +1,111 @@
+-- Crear tabla Sucursal
+CREATE TABLE Sucursal (
+    codigo VARCHAR(10) PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    departamento VARCHAR(100) NOT NULL,
+    municipio VARCHAR(100) NOT NULL,
+    director VARCHAR(100),
+    presupuesto DECIMAL(15, 2) NOT NULL
+);
+
+-- Insertar datos de ejemplo en Sucursal
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) 
+VALUES ('001', 'Sucursal Centro', 'Quindío', 'Armenia', 'Laura González', 15000000),
+       ('002', 'Sucursal Norte', 'Quindío', 'Armenia', 'Carlos Pérez', 20000000),
+       ('003', 'Sucursal Sur', 'Quindío', 'Calarcá', 'María Rodríguez', 18000000);
+
+-- Crear tabla Empleado con id_empleado autoincrementable
+CREATE TABLE Empleado (
+    id_empleado INT IDENTITY(1,1) PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    sucursal_codigo VARCHAR(10),
+    puesto VARCHAR(100) NOT NULL,
+    salario DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (sucursal_codigo) REFERENCES Sucursal(codigo)
+);
+
+-- Insertar datos de ejemplo en Empleado
+INSERT INTO Empleado (nombre, apellido, sucursal_codigo, puesto, salario) 
+VALUES ('Juan', 'Ramírez', '001', 'OPERARIO', 2500000),
+       ('Ana', 'Martínez', '002', 'ADMINISTRATIVO', 3500000),
+       ('Pedro', 'López', '003', 'EJECUTIVO', 2800000);
+
+-- Crear tabla SolicitudPrestamo con id autoincrementable
+CREATE TABLE SolicitudPrestamo (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    id_empleado INT FOREIGN KEY REFERENCES Empleado(id_empleado),
+    monto DECIMAL(15, 2) NOT NULL,
+    periodo INT NOT NULL,
+    interes DECIMAL(15, 2) NOT NULL,
+    fecha_solicitud DATETIME NOT NULL,
+    estado VARCHAR(50) NOT NULL
+);
+
+-- Insertar datos de ejemplo en SolicitudPrestamo
+INSERT INTO SolicitudPrestamo (id_empleado, monto, periodo, interes, fecha_solicitud, estado) 
+VALUES (1, 5000000, 12, 5.5, '2024-01-15 00:00:00', 'APROBADA'),
+       (2, 10000000, 24, 6.0, '2023-05-20 00:00:00', 'PENDIENTE'),
+       (3, 7500000, 18, 4.5, '2023-08-10 00:00:00', 'CANCELADA'),
+       (3, 3000000, 6, 3.0, '2024-03-01 00:00:00', 'NO_APROBADA');
+
+-- Crear tabla Prestamo con id autoincrementable
+CREATE TABLE Prestamo (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    id_solicitud INT FOREIGN KEY REFERENCES SolicitudPrestamo(id),
+    fecha_aprobacion DATETIME NOT NULL,
+    fecha_vencimiento DATETIME NOT NULL,
+    saldo_pendiente DECIMAL(15, 2) NOT NULL,
+    estado_prestamo VARCHAR(50) NOT NULL
+);
+
+-- Insertar datos de ejemplo en Prestamo
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, estado_prestamo) 
+VALUES (1, '2024-01-20 00:00:00', '2025-05-20 00:00:00', 5000000, 'ACTIVO'),
+       (2, '2023-05-25 00:00:00', '2025-05-20 00:00:00', 0, 'CANCELADO'),
+       (3, '2023-08-15 00:00:00', '2025-05-20 00:00:00', 7500000, 'PAGADO'),
+       (4, '2024-03-05 00:00:00', '2025-05-20 00:00:00', 1500000, 'MORA');
+
+-- Crear tabla Pago con id autoincrementable
+CREATE TABLE Pago (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    id_prestamo INT FOREIGN KEY REFERENCES Prestamo(id),
+    monto_pagado DECIMAL(15, 2) NOT NULL,
+    fecha_pago DATETIME NOT NULL,
+    metodo_pago VARCHAR(50) NOT NULL
+);
+
+-- Insertar datos de ejemplo en Pago
+INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, metodo_pago) 
+VALUES (1, 500000.00, '2024-09-01 00:00:00', 'TRANSFERENCIA'),
+       (2, 1000000.00, '2024-09-05 00:00:00', 'EFECTIVO'),
+       (1, 500000.00, '2024-10-01 00:00:00', 'PSE');
+
+-- Crear tabla Usuario con id_empleado como clave foránea
+CREATE TABLE Usuario (
+    id_empleado INT PRIMARY KEY FOREIGN KEY REFERENCES Empleado(id_empleado),
+    nombre_usuario VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(50) NOT NULL,
+    contraseña VARCHAR(100) NOT NULL,
+    rol VARCHAR(50) NOT NULL
+);
+
+-- Insertar datos de ejemplo en Usuario
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, rol) 
+VALUES (1, 'ADMIN', 'admin@gmail.com', HASHBYTES('SHA2_256', 'admin'), 'PRINCIPAL'),
+       (2, 'ANA', 'anam@gmail.com', HASHBYTES('SHA2_256', 'ana123'), 'TESORERIA'),
+       (3, 'PEDRO', 'pedror@gmail.com', HASHBYTES('SHA2_256', 'pedro123'), 'EMPLEADO');
+
+-- Crear tabla LogSesion con id autoincrementable
+CREATE TABLE LogSesion (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    id_usuario INT FOREIGN KEY REFERENCES Usuario(id_empleado),
+    fecha DATETIME NOT NULL,
+    tipo VARCHAR(50) CHECK (tipo IN ('ENTRADA', 'SALIDA')) NOT NULL,
+    estado VARCHAR(20) CHECK (estado IN ('EXITOSO', 'FALLIDO')) NOT NULL
+);
+
+-- Insertar datos de ejemplo en LogSesion
+INSERT INTO LogSesion (id_usuario, fecha, tipo, estado) 
+VALUES (1, GETDATE(), 'ENTRADA', 'EXITOSO'),
+       (2, GETDATE(), 'SALIDA', 'FALLIDO');
