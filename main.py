@@ -1,5 +1,6 @@
 import sys
 import hashlib
+import os
 
 from datetime import datetime, timedelta
 
@@ -7,12 +8,20 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QAction, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QPushButton, QLineEdit, QFormLayout, QWidget,
     QComboBox, QMessageBox, QHBoxLayout, QLabel, QDateEdit, QCheckBox, 
-    QHeaderView
+    QHeaderView, QFileDialog, QListWidget, QAbstractItemView
 )
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 from PyQt5.QtCore import QDate, QDateTime, Qt
 from datetime import timedelta
+import pandas as pd
+import matplotlib.pyplot as plt
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import Table, TableStyle
 from database import get_connection
+from database import create_sqlalchemy_engine
 from dao import SucursalDAO
 from dto import SucursalDTO
 from dao import EmpleadoDAO
@@ -31,6 +40,7 @@ from dto import PagoTablaDTO
 from dao import LogSesionDAO
 from dto import LogSesionSqlDTO
 from dto import LogSesionTablaDTO
+from dao import ReporteDAO
 
 SALARY_RANGES = {
     "OPERARIO": 5000000,
@@ -123,6 +133,7 @@ class BankApp(QMainWindow):
         self.sub_windows = []  # Lista para almacenar ventanas superpuestas
         self.usuario = usuario
         self.connection = get_connection()
+        self.engine = create_sqlalchemy_engine()
         self.sucursal_dao = SucursalDAO(self.connection)
         self.empleado_dao = EmpleadoDAO(self.connection)
         self.usuario_dao = UsuarioDAO(self.connection)
@@ -130,6 +141,7 @@ class BankApp(QMainWindow):
         self.prestamo_dao = PrestamoDAO(self.connection)
         self.pago_dao = PagoDAO(self.connection)
         self.log_sesion_dao = LogSesionDAO(self.connection)
+        self.reporte_dao = ReporteDAO(self.engine)
         
         self.setWindowTitle("Sistema de Gestión Bancaria")
 
@@ -223,7 +235,7 @@ class BankApp(QMainWindow):
 
         reports_menu = self.menu_bar.addMenu("Reportes y Consultas")
         morosos_report_action = QAction("Reporte de Morosos", self)
-        morosos_report_action.triggered.connect(self.generate_morosos_report)
+        morosos_report_action.triggered.connect(self.show_report_selection_window)
         reports_menu.addAction(morosos_report_action)
 
         session_logs_action = QAction("Logs de Sesion", self)
@@ -1605,11 +1617,14 @@ class BankApp(QMainWindow):
 
     def calcular_pagos_pendientes(self, fecha_ultimo_pago, fecha_inicio_prestamo):
         fecha_actual = datetime.now()
+
         if  fecha_ultimo_pago is None or fecha_ultimo_pago == "None":
             fecha_ultimo_pago = fecha_inicio_prestamo
+            fecha_ultimo_pago = datetime.strptime(str(fecha_ultimo_pago), '%Y-%m-%d %H:%M:%S')
         else:
             fecha_ultimo_pago = datetime.strptime(fecha_ultimo_pago, '%Y-%m-%d %H:%M:%S')
         
+
         pagos_pendientes = 0
         
         # Fecha límite del siguiente pago: el día 10 del mes siguiente al último pago
@@ -2118,10 +2133,288 @@ class BankApp(QMainWindow):
             self.log_table.setItem(i, 6, QTableWidgetItem(log.tipo))
             self.log_table.setItem(i, 7, QTableWidgetItem(log.estado))
 
+    def show_report_selection_window(self):
+        # Limpiar el layout central antes de agregar el nuevo contenido
+        self.clear_layout()
 
-    def generate_morosos_report(self):
-        report_data = generate_morosos_report()
-        self.create_pdf_report(report_data, "reporte_morosos.pdf")
+        # Título de la ventana
+        title_label = QLabel("Seleccionar tipos de reportes")
+        title_label.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(title_label)
+
+        # Crear un QListWidget para seleccionar múltiples reportes
+        self.report_list = QListWidget()
+        self.report_list.setSelectionMode(QAbstractItemView.MultiSelection)  # Permitir selección múltiple
+        self.report_list.addItem("Reporte de Morosos")
+        self.report_list.addItem("Total Prestado por Municipio")
+        self.report_list.addItem("Total Prestado por Sucursal")
+        self.report_list.addItem("Reporte Préstamos por Empleado")
+        self.report_list.addItem("Total Prestado y Saldo Pendiente por Empleado")
+        self.report_list.addItem("Total Estados de Solicitud de Prestamos")
+        self.report_list.addItem("Total Estados de Prestamos")
+        self.report_list.addItem("Pagos Realizados por Empleado")
+        self.report_list.addItem("Pagos Totales Realizados por Empleado")
+        self.report_list.addItem("Ganancias Totales por Intereses")  # Nuevo reporte
+        self.report_list.addItem("Total Prestado por Banco")  # Nuevo reporte
+        self.report_list.addItem("Grafico de Barras de Estado de Prestamos")  # Imagen de Estadisticas de Estados de los Prestamos
+        self.report_list.addItem("Grafico de Barras de Prestamos por Empleado")  # Imagen de Estadisticas de Estados de los Prestamos
+
+        self.layout.addWidget(self.report_list)
+
+        # Botón para generar los reportes seleccionados
+        generate_report_button = QPushButton("Generar Reportes Seleccionados")
+        generate_report_button.clicked.connect(self.generate_selected_reports)
+        self.layout.addWidget(generate_report_button)
+
+    def generate_selected_reports(self):
+        # Obtener los reportes seleccionados
+        selected_reports = [item.text() for item in self.report_list.selectedItems()]
+
+        if not selected_reports:
+            QMessageBox.warning(self, "Error", "Por favor, selecciona al menos un reporte.")
+            return
+
+        # Seleccionar ruta para guardar el PDF
+        pdf_filename, _ = QFileDialog.getSaveFileName(self, "Guardar Reporte", "", "PDF Files (*.pdf)")
+        if not pdf_filename:
+            return  # Si el usuario cancela la selección de archivo
+
+        # Crear el PDF
+        pdf = canvas.Canvas(pdf_filename, pagesize=letter)
+
+        # Generar cada reporte seleccionado
+        for i, report in enumerate(selected_reports):
+            if i > 0:
+                pdf.showPage()  # Nueva página para cada reporte
+            if report == "Reporte de Morosos":
+                self.generate_morosos_report_pdf(pdf)
+            elif report == "Total Prestado por Municipio":
+                self.generate_total_prestado_municipio_report_pdf(pdf)
+            elif report == "Total Prestado por Sucursal":
+                self.generate_total_prestado_sucursal_report_pdf(pdf)
+            elif report == "Reporte Préstamos por Empleado":
+                self.generate_prestamos_por_empleado_report_pdf(pdf)
+            elif report == "Total Prestado y Saldo Pendiente por Empleado":
+                self.generate_total_prestamos_y_saldo_pendiente_por_empleado_report_pdf(pdf)
+            elif report == "Total Estados de Solicitud de Prestamos":
+                self.generate_total_estado_solicitud_prestamo_report_pdf(pdf)
+            elif report == "Total Estados de Prestamos":
+                self.generate_total_estado_prestamo_report_pdf(pdf)
+            elif report == "Pagos Realizados por Empleado":
+                self.generate_pagos_por_empleado_report_pdf(pdf)
+            elif report == "Pagos Totales Realizados por Empleado":
+                self.generate_total_pagos_por_empleado_report_pdf(pdf)
+            elif report == "Ganancias Totales por Intereses":  # Nuevo reporte
+                self.generate_ganancias_intereses_report_pdf(pdf)
+            elif report == "Total Prestado por Banco":  # Nuevo reporte
+                self.generate_total_prestado_banco_report_pdf(pdf)
+            elif report == "Grafico de Barras de Estado de Prestamos":  # Nuevo reporte
+                self.generate_diagrama_barras_estado_prestamos_report_pdf(pdf)
+            elif report == "Grafico de Barras de Prestamos por Empleado":  # Nuevo reporte
+                self.generate_diagrama_barras_prestamos_empleados_report_pdf(pdf)
+
+        # Guardar el PDF
+        pdf.save()
+        QMessageBox.information(self, "Éxito", f"Reportes generados y guardados en {pdf_filename}")
+    # Los métodos de generación de reportes individuales
+
+    def generate_morosos_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_morosos()
+
+        # Lista para guardar los morosos reales después de aplicar la lógica de pagos pendientes
+        morosos = []
+
+        # Procesar cada fila de los resultados
+        for index, row in df.iterrows():
+            id_prestamo = row['id_prestamo']
+            id_empleado = row['id_empleado']
+            fecha_inicio = row['fecha_aprobacion']
+            
+            # Obtener la fecha del último pago desde la tabla Pago
+            fecha_ultimo_pago = self.pago_dao.obtener_fecha_ultimo_pago(id_prestamo)
+
+            fecha_inicio = str(fecha_inicio)
+            fecha_ultimo_pago = str(fecha_ultimo_pago)
+            pagos_pendientes = self.calcular_pagos_pendientes(fecha_ultimo_pago, fecha_inicio)
+
+            # Si hay pagos pendientes, se considera al cliente moroso
+            if pagos_pendientes > 0:
+                monto = row['monto']
+                interes = row['interes']
+                periodo = row['periodo']
+                
+                # Cálculo de la cuota mensual
+                cuota = (monto + (monto * (interes / 100))) / periodo
+                monto_deuda_mora = cuota * pagos_pendientes  # Deuda acumulada en mora
+
+                moroso_data = {
+                    'id_prestamo': id_prestamo,
+                    'id_empleado': id_empleado,
+                    'nombre': row['nombre'],
+                    'apellido': row['apellido'],
+                    'cuotas_pendientes': pagos_pendientes,
+                    'deuda_mora': monto_deuda_mora
+                }
+                morosos.append(moroso_data)
+
+        # Crear DataFrame con los morosos reales
+        morosos_df = pd.DataFrame(morosos)
+
+        # Generar el reporte PDF si hay morosos
+        if not morosos_df.empty:
+            self.create_pdf_report(morosos_df, pdf, "Reporte de Morosos")
+        else:
+            QMessageBox.information(None, "Información", "No hay clientes morosos en este momento.")
+
+    def generate_total_prestado_municipio_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_prestado_por_municipio()
+
+        self.create_pdf_report(df, pdf, "Total Prestado por Municipio")
+
+    def generate_total_prestado_sucursal_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_prestado_por_sucursal()
+
+        self.create_pdf_report(df, pdf, "Total Prestado por Sucursal")
+
+    def generate_prestamos_por_empleado_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_prestamos_por_empleado()
+
+        self.create_pdf_report(df, pdf, "Reporte de Préstamos por Empleado")
+
+    def generate_total_prestamos_y_saldo_pendiente_por_empleado_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_prestamos_y_saldo_por_empleado()
+
+        self.create_pdf_report(df, pdf, "Reporte de Total de Prestado y Saldo Pendiente por Empleado")
+
+    def generate_total_estado_solicitud_prestamo_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_estados_solicitud_prestamos()
+
+        self.create_pdf_report(df, pdf, "Total Estados de Solicitud de Prestamos")
+
+    def generate_total_estado_prestamo_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_estados_prestamos()
+
+        self.create_pdf_report(df, pdf, "Total Estados de Prestamos")
+
+    def generate_pagos_por_empleado_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_pagos_por_empleado()
+
+        self.create_pdf_report(df, pdf, "Pagos Realizados por Empleado")
+
+    def generate_total_pagos_por_empleado_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_pagado_y_numero_pagos_por_empleado()
+
+        self.create_pdf_report(df, pdf, "Pagos Totales Realizados por Empleado")
+
+    def generate_total_prestado_banco_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_total_prestado_por_banco()
+
+        self.create_pdf_report(df, pdf, "Total Prestado por el Banco")
+
+    def generate_ganancias_intereses_report_pdf(self, pdf):
+        df = self.reporte_dao.generar_ganancias_por_intereses()
+
+        # Calcular el total de intereses
+        intereses_totales = 0
+
+        for index, row in df.iterrows():
+            intereses_totales += row['intereses_ganados'];
+
+        # Crear el reporte en PDF
+        self.create_pdf_report(df, pdf, f"Reporte de Ganancias Totales con Intereses: ${intereses_totales:.2f}")
+
+    def generate_diagrama_barras_estado_prestamos_report_pdf(self, pdf):
+        image_path = self.crear_diagrama_barras_estado_prestamos()
+
+        # Insertar la imagen en el PDF
+        ##pdf.showPage()  # Nueva página para el gráfico
+        pdf.drawString(100, 750, "Gráfico de Préstamos por Estado")
+        pdf.drawImage(image_path, 100, 500, width=400, height=300)
+
+        # Eliminar la imagen temporal
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
+    def crear_diagrama_barras_estado_prestamos(self):
+        df = self.reporte_dao.generar_grafica_prestamos_por_estado()
+
+        # Crear gráfico de barras para los estados de los préstamos
+        plt.figure(figsize=(10, 6))
+        df.plot(kind='bar', x='estado_prestamo', y='total', legend=False)
+        plt.title('Número de Préstamos por Estado')
+        plt.xlabel('Estado del Préstamo')
+        plt.ylabel('Total')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        # Guardar la imagen en el disco
+        image_path = 'prestamos_por_estado.png'
+        plt.savefig(image_path)
+        plt.close()
+
+        return image_path
+
+    def generate_diagrama_barras_prestamos_empleados_report_pdf(self, pdf):
+        image_path = self.crear_diagrama_barras_apiladas_prestamos_empleados()
+
+        # Insertar la imagen en el PDF
+        pdf.drawString(100, 750, "Gráfico de Total Prestado por Empleado y Número de Préstamos")
+        pdf.drawImage(image_path, 100, 500, width=400, height=300)
+
+        # Eliminar la imagen temporal
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
+    def crear_diagrama_barras_apiladas_prestamos_empleados(self):
+        # Obtener los datos con la consulta SQL
+        df = self.reporte_dao.generar_grafica_total_prestado_y_prestamos_por_empleado()
+
+        # Crear gráfico de barras apiladas
+        plt.figure(figsize=(12, 8))
+        
+        # Dibujar barras con el total prestado
+        plt.bar(df['id_empleado'].astype(str), df['total_prestado'], color='skyblue', label='Total Prestado')
+
+        # Dibujar otra serie de barras apiladas para el número de préstamos
+        plt.bar(df['id_empleado'].astype(str), df['num_prestamos'], bottom=df['total_prestado'], color='orange', label='Número de Préstamos')
+
+        # Añadir etiquetas a las barras
+        for idx, row in df.iterrows():
+            total = row['total_prestado']
+            prestamos = row['num_prestamos']
+            plt.annotate(f'{total:,.0f}', xy=(idx, total / 2), ha='center', va='center', color='black', fontsize=10)
+            plt.annotate(f'{prestamos}', xy=(idx, total + prestamos / 2), ha='center', va='center', color='black', fontsize=10)
+
+        # Configurar las etiquetas y el título
+        plt.title('Total Prestado y Número de Préstamos por Empleado', fontsize=16)
+        plt.xlabel('ID del Empleado', fontsize=12)
+        plt.ylabel('Cantidad', fontsize=12)
+        plt.xticks(rotation=45, fontsize=10)
+        plt.legend()
+        plt.tight_layout()
+
+        # Guardar la imagen en el disco
+        image_path = 'prestamos_por_empleado_apiladas.png'
+        plt.savefig(image_path)
+        plt.close()
+
+        return image_path
+
+    # Método general para generar el contenido del PDF
+    def create_pdf_report(self, df, pdf, report_title):
+        # Agregar título del reporte
+        pdf.drawString(100, 750, report_title)
+
+        # Ajustar contenido de la tabla
+        y = 730
+        for index, row in df.iterrows():
+            row_str = " | ".join([str(item) for item in row])
+            pdf.drawString(100, y, row_str[:100])  # Mostrar solo los primeros 100 caracteres por fila
+            y -= 15
+            if y < 50:  # Si se alcanza el final de la página, crear una nueva página
+                pdf.showPage()
+                y = 750
+
 
     def clear_layout(self):
         while self.layout.count():
@@ -2144,19 +2437,6 @@ class BankApp(QMainWindow):
                 sub_layout = item.layout()
                 if sub_layout is not None:
                     self.clear_sub_layout(sub_layout)
-
-    def create_pdf_report(self, report_data, file_name):
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
-        
-        c = canvas.Canvas(file_name, pagesize=letter)
-        c.drawString(100, 750, "Reporte de Morosos")
-        # Agrega más lógica para escribir los datos del reporte
-        y = 730
-        for line in report_data:
-            c.drawString(100, y, line)
-            y -= 15
-        c.save()
 
 if __name__ == "__main__":
     app = QApplication([])

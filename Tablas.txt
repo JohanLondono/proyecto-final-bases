@@ -3,6 +3,11 @@
 //Instalar cx_Oracle en la terminal: pip install cx_Oracle (Si da errores, deben instalar microsoft c++ build tools)
 //otra opcion es: pip install oracledb (Esta no la he probado)
 
+//Instalar pandas para los reportes: pip install pandas
+//Instalar reportlab para los PDFS: pip install reportlab
+//Instalar sqlalchemy para las queries de las bases de datos con pandas: pip install sqlalchemy
+//Instalar matplotlib para las graficas: pip install matplotlib
+
 //Crear las siguientes tablas (Ejecutar los bloques de codigo SQL uno por uno, Los inserts si pueden ejecutarlos todos de una
 //Si los seleccionan todos en el Sql_Developer)
 
@@ -17,9 +22,9 @@ CREATE TABLE Sucursal (
 );
 
 -- Insertar datos de ejemplo
-INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('001', 'Sucursal Centro', 'Quindío', 'Armenia', 'Laura González', 15000000);
-INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('002', 'Sucursal Norte', 'Quindío', 'Armenia', 'Carlos Pérez', 20000000);
-INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('003', 'Sucursal Sur', 'Quindío', 'Calarcá', 'María Rodríguez', 18000000);
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('001', 'Sucursal Centro', 'QUINDIO', 'ARMENIA', 'Laura González', 15000000);
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('002', 'Sucursal Norte', 'QUINDIO', 'ARMENIA', 'Carlos Pérez', 20000000);
+INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto) VALUES ('003', 'Sucursal Sur', 'QUINDIO', 'CALARCA', 'María Rodríguez', 18000000);
 
 CREATE TABLE Empleado (
     id_empleado NUMBER PRIMARY KEY,

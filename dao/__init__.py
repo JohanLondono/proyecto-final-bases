@@ -5,9 +5,10 @@ from .solicitud_prestamo_dao import SolicitudPrestamoDAO
 from .prestamo_dao import PrestamoDAO
 from .pago_dao import PagoDAO
 from .log_sesion_dao import LogSesionDAO
+from .reporte_dao import ReporteDAO
 
 __all__ = [
     'SucursalDAO', 'EmpleadoDAO', 'UsuarioDAO', 
     'SolicitudPrestamoDAO', 'PrestamoDAO', 'PagoDAO', 
-    'LogSesionDAO'
+    'LogSesionDAO, ReporteDAO'
 ]
