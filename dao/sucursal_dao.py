@@ -1,16 +1,31 @@
-from dto import SucursalDTO
+from dto import SucursalSqlDTO
+from dto import SucursalTablaDTO
 from typing import List
 
 class SucursalDAO:
     def __init__(self, connection):
         self.connection = connection
 
-    def obtener_todas_las_sucursales(self) -> List[SucursalDTO]:
+    def obtener_todas_las_sucursales(self) -> List[SucursalTablaDTO]:
         try: 
             cursor = self.connection.cursor()
-            cursor.execute("SELECT codigo, nombre, departamento, municipio, director, presupuesto FROM Sucursal")
+            query = """
+            SELECT 
+                s.codigo, 
+                s.nombre,         
+                de.nombre, 
+                mu.nombre, 
+                s.presupuesto
+            FROM 
+                Sucursal s
+            JOIN 
+                Municipio mu ON s.id_municipio = mu.id
+            JOIN
+                Departamento de ON mu.id_departamento = de.id
+            """
+            cursor.execute(query)
             filas = cursor.fetchall()
-            sucursales = [SucursalDTO(*fila) for fila in filas]
+            sucursales = [SucursalTablaDTO(*fila) for fila in filas]
             cursor.close()
 
             return sucursales
@@ -18,13 +33,13 @@ class SucursalDAO:
             print(f"Error al recuperar las Sucursales: {e}")
             return []
         
-    def insertar_sucursal(self, sucursal: SucursalDTO):
+    def insertar_sucursal(self, sucursal: SucursalSqlDTO):
         cursor = self.connection.cursor()
         try:
             cursor.execute("""
-                INSERT INTO Sucursal (codigo, nombre, departamento, municipio, director, presupuesto)
-                VALUES (:1, :2, :3, :4, :5, :6)""",
-                (sucursal.codigo, sucursal.nombre, sucursal.departamento, sucursal.municipio, sucursal.director, sucursal.presupuesto))
+                INSERT INTO Sucursal (codigo, id_municipio, nombre, presupuesto)
+                VALUES (:1, :2, :3, :4)""",
+                (sucursal.codigo, sucursal.id_municipio, sucursal.nombre, sucursal.presupuesto))
             self.connection.commit()
         except Exception as e:
             self.connection.rollback()
@@ -43,28 +58,42 @@ class SucursalDAO:
         finally:
             cursor.close()
 
-    def buscar_sucursales(self, codigo=None, nombre=None, departamento=None, municipio=None) -> List[SucursalDTO]:
-        query = "SELECT codigo, nombre, departamento, municipio, director, presupuesto FROM Sucursal WHERE 1=1"
+    def buscar_sucursales(self, codigo=None, nombre=None, id_departamento=None, id_municipio=None) -> List[SucursalTablaDTO]:
+        query = """
+        SELECT 
+            s.codigo, 
+            s.nombre,         
+            de.nombre, 
+            mu.nombre, 
+            s.presupuesto
+        FROM 
+            Sucursal s
+        JOIN 
+            Municipio mu ON s.id_municipio = mu.id
+        JOIN
+            Departamento de ON mu.id_departamento = de.id
+        WHERE 1=1
+        """
         parameters = []
 
         if codigo:
             query += " AND codigo LIKE :1"
             parameters.append(f"%{codigo}%")
         if nombre:
-            query += " AND UPPER(nombre) LIKE :2"
+            query += " AND UPPER(s.nombre) LIKE :2"
             parameters.append(f"%{nombre.upper()}%")
-        if departamento:
-            query += " AND UPPER(departamento) LIKE :3"
-            parameters.append(f"%{departamento.upper()}%")
-        if municipio:
-            query += " AND UPPER(municipio) LIKE :4"
-            parameters.append(f"%{municipio.upper()}%")
+        if id_departamento:
+            query += " AND de.id = :3"
+            parameters.append(f"{id_departamento}")
+        if id_municipio:
+            query += " AND mu.id = :4"
+            parameters.append(f"{id_municipio}")
         try: 
             cursor = self.connection.cursor()
             cursor.execute(query, parameters)
             filas = cursor.fetchall()
 
-            sucursales = [SucursalDTO(*fila) for fila in filas]
+            sucursales = [SucursalTablaDTO(*fila) for fila in filas]
             cursor.close()
 
             return sucursales

@@ -1,0 +1,409 @@
+//Tener instalado instant-client para poder conectarnos de python a oracle (La version que tengan de Oracle)
+
+//Instalar cx_Oracle en la terminal: pip install cx_Oracle (Si da errores, deben instalar microsoft c++ build tools)
+//otra opcion es: pip install oracledb (Esta no la he probado)
+
+//Instalar pandas para los reportes: pip install pandas
+//Instalar reportlab para los PDFS: pip install reportlab
+//Instalar sqlalchemy para las queries de las bases de datos con pandas: pip install sqlalchemy
+//Instalar matplotlib para las graficas: pip install matplotlib
+
+//Crear las siguientes tablas (Ejecutar los bloques de codigo SQL uno por uno, Los inserts si pueden ejecutarlos todos de una
+//Si los seleccionan todos en el Sql_Developer)
+
+CREATE SEQUENCE seq_departamento_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE Departamento (
+    id NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_departamento
+BEFORE INSERT ON Departamento
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_departamento_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+-- Insertar datos de ejemplo
+INSERT INTO Departamento (nombre) VALUES ('QUINDIO');
+INSERT INTO Departamento (nombre) VALUES ('RISARALDA');
+
+
+
+CREATE SEQUENCE seq_municipio_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE Municipio (
+    id NUMBER PRIMARY KEY,
+    id_departamento NUMBER REFERENCES Departamento(id),
+    nombre VARCHAR2(100) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_municipio
+BEFORE INSERT ON Municipio
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_municipio_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO Municipio (id_departamento, nombre) VALUES (1, 'ARMENIA');
+INSERT INTO Municipio (id_departamento, nombre) VALUES (1, 'CALARCA');
+INSERT INTO Municipio (id_departamento, nombre) VALUES (2, 'PEREIRA');
+
+CREATE TABLE Sucursal (
+    codigo VARCHAR2(10) PRIMARY KEY,
+	id_municipio NUMBER REFERENCES Municipio(id),
+    nombre VARCHAR2(100) NOT NULL,
+    presupuesto NUMBER(15, 2) NOT NULL
+);
+
+-- Insertar datos de ejemplo
+INSERT INTO Sucursal (codigo, id_municipio, nombre, presupuesto) VALUES ('001', 1, 'Sucursal Centro', 15000000);
+INSERT INTO Sucursal (codigo, id_municipio, nombre, presupuesto) VALUES ('002', 1, 'Sucursal Norte', 20000000);
+INSERT INTO Sucursal (codigo, id_municipio, nombre, presupuesto) VALUES ('003', 2, 'Sucursal Sur', 18000000);
+
+
+CREATE SEQUENCE seq_tipo_cargo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE TipoCargo (
+    id NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL,
+	salario NUMBER(10, 2) NOT NULL,
+	tope_salario NUMBER(11, 2) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_tipo_cargo
+BEFORE INSERT ON TipoCargo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_tipo_cargo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO TipoCargo (nombre, salario, tope_salario) VALUES ('OPERARIO', 2500000, 10000000);
+INSERT INTO TipoCargo (nombre, salario, tope_salario) VALUES ('ADMINISTRATIVO', 3500000, 15000000);
+INSERT INTO TipoCargo (nombre, salario, tope_salario) VALUES ('EJECUTIVO', 2800000, 20000000);
+
+CREATE TABLE Empleado (
+    id_empleado NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL,
+    apellido VARCHAR2(100) NOT NULL,
+    sucursal_codigo VARCHAR2(10) REFERENCES Sucursal(codigo),
+    id_tipo_cargo NUMBER REFERENCES TipoCargo(id)
+);
+
+-- Insertar datos de ejemplo
+INSERT INTO Empleado (id_empleado, nombre, apellido, sucursal_codigo, id_tipo_cargo) VALUES (1, 'Juan', 'Ramírez', '001', 1);
+INSERT INTO Empleado (id_empleado, nombre, apellido, sucursal_codigo, id_tipo_cargo) VALUES (2, 'Ana', 'Martínez', '002', 2);
+INSERT INTO Empleado (id_empleado, nombre, apellido, sucursal_codigo, id_tipo_cargo) VALUES (3, 'Pedro', 'López', '003', 3);
+
+
+CREATE SEQUENCE seq_tipo_periodo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE TipoPeriodo (
+    id NUMBER PRIMARY KEY,
+    meses NUMBER NOT NULL,
+	interes NUMBER(15,2) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_tipo_periodo
+BEFORE INSERT ON TipoPeriodo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_tipo_periodo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO TipoPeriodo (meses, interes) VALUES (24, 7);
+INSERT INTO TipoPeriodo (meses, interes) VALUES (36, 7.5);
+INSERT INTO TipoPeriodo (meses, interes) VALUES (48, 8);
+INSERT INTO TipoPeriodo (meses, interes) VALUES (60, 8.3);
+INSERT INTO TipoPeriodo (meses, interes) VALUES (72, 8.6);
+
+CREATE SEQUENCE seq_tipo_estado_solicitud_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE TipoEstadoSolicitud (
+    id NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_tipo_estado_solicitud
+BEFORE INSERT ON TipoEstadoSolicitud
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_tipo_estado_solicitud_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO TipoEstadoSolicitud (nombre) VALUES ('APROBADA');
+INSERT INTO TipoEstadoSolicitud (nombre) VALUES ('CANCELADA');
+INSERT INTO TipoEstadoSolicitud (nombre) VALUES ('NO_APROBADA');
+INSERT INTO TipoEstadoSolicitud (nombre) VALUES ('EN_ESTUDIO');
+INSERT INTO TipoEstadoSolicitud (nombre) VALUES ('PENDIENTE');
+
+
+//CREAR TABLA SolicitudPrestamo
+
+CREATE SEQUENCE seq_solicitudprestamo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+
+CREATE TABLE SolicitudPrestamo (
+    id NUMBER PRIMARY KEY,
+    id_empleado NUMBER REFERENCES Empleado(id_empleado),
+    monto NUMBER NOT NULL,
+	id_tipo_periodo NUMBER REFERENCES TipoPeriodo(id),
+    fecha_solicitud TIMESTAMP NOT NULL,
+    id_tipo_estado_solicitud NUMBER REFERENCES TipoEstadoSolicitud(id)
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_solicitudprestamo
+BEFORE INSERT ON SolicitudPrestamo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_solicitudprestamo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+-- Solicitud 1
+INSERT INTO SolicitudPrestamo (id_empleado, monto, id_tipo_periodo, fecha_solicitud, id_tipo_estado_solicitud)
+VALUES (1, 5000000, 1, TO_TIMESTAMP('2024-01-15 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1);
+-- Solicitud 2
+INSERT INTO SolicitudPrestamo (id_empleado, monto, id_tipo_periodo, fecha_solicitud, id_tipo_estado_solicitud)
+VALUES (2, 10000000, 1, TO_TIMESTAMP('2023-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 5);
+-- Solicitud 3
+INSERT INTO SolicitudPrestamo (id_empleado, monto, id_tipo_periodo, fecha_solicitud, id_tipo_estado_solicitud)
+VALUES (3, 7500000, 2, TO_TIMESTAMP('2023-08-10 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 2);
+-- Solicitud 4
+INSERT INTO SolicitudPrestamo (id_empleado, monto, id_tipo_periodo, fecha_solicitud, id_tipo_estado_solicitud)
+VALUES (3, 3000000, 2, TO_TIMESTAMP('2024-03-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 3);
+
+CREATE SEQUENCE seq_tipo_estado_prestamo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE TipoEstadoPrestamo (
+    id NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_tipo_estado_prestamo
+BEFORE INSERT ON TipoEstadoPrestamo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_tipo_estado_prestamo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO TipoEstadoPrestamo (nombre) VALUES ('ACTIVO');
+INSERT INTO TipoEstadoPrestamo (nombre) VALUES ('CANCELADO');
+INSERT INTO TipoEstadoPrestamo (nombre) VALUES ('PAGADO');
+INSERT INTO TipoEstadoPrestamo (nombre) VALUES ('MORA');
+
+
+//CREAR TABLA Prestamo
+
+CREATE SEQUENCE seq_prestamo_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE Prestamo (
+    id NUMBER PRIMARY KEY,
+    id_solicitud NUMBER REFERENCES SolicitudPrestamo(id),
+    fecha_aprobacion TIMESTAMP NOT NULL,
+	fecha_vencimiento TIMESTAMP NOT NULL,
+    saldo_pendiente NUMBER(15,2) NOT NULL,
+    id_tipo_estado_prestamo NUMBER REFERENCES TipoEstadoPrestamo(id)
+);
+
+//En la tabla colocar, la fecha de ultimo pago, el numero de pagos
+
+CREATE OR REPLACE TRIGGER trg_before_insert_prestamo
+BEFORE INSERT ON Prestamo
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_prestamo_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+-- Préstamo 1 (Activo)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, id_tipo_estado_prestamo)
+VALUES (1, TO_TIMESTAMP('2024-01-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 5350000, 1);
+
+-- Préstamo 2 (Cancelado)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, id_tipo_estado_prestamo)
+VALUES (2, TO_TIMESTAMP('2023-05-25 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 10700000, 2);
+
+-- Préstamo 3 (Pagado)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, id_tipo_estado_prestamo)
+VALUES (3, TO_TIMESTAMP('2023-08-15 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 0, 3);
+
+-- Préstamo 4 (En Mora)
+INSERT INTO Prestamo (id_solicitud, fecha_aprobacion, fecha_vencimiento, saldo_pendiente, id_tipo_estado_prestamo)
+VALUES (4, TO_TIMESTAMP('2024-03-05 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-05-20 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 3225000, 4);
+
+CREATE SEQUENCE seq_tipo_pago_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE TipoPago (
+    id NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_tipo_pago
+BEFORE INSERT ON TipoPago
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_tipo_pago_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO TipoPago (nombre) VALUES ('TRANSFERENCIA');
+INSERT INTO TipoPago (nombre) VALUES ('EFECTIVO');
+INSERT INTO TipoPago (nombre) VALUES ('PSE');
+INSERT INTO TipoPago (nombre) VALUES ('NEQUI');
+
+CREATE SEQUENCE seq_pago_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE Pago (
+    id NUMBER PRIMARY KEY,
+    id_prestamo NUMBER REFERENCES Prestamo(id),
+    monto_pagado NUMBER(15, 2) NOT NULL,
+    fecha_pago TIMESTAMP NOT NULL,
+	id_tipo_pago NUMBER REFERENCES TipoPago(id)
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_pago
+BEFORE INSERT ON Pago
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_pago_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+
+-- Pago 3 para Préstamo 1
+INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, id_tipo_pago)
+VALUES (3, 8062500, TO_TIMESTAMP('2024-10-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS'), 3);
+
+
+CREATE SEQUENCE seq_tipo_usuario_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE TipoUsuario (
+    id NUMBER PRIMARY KEY,
+    nombre VARCHAR2(100) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_tipo_usuario
+BEFORE INSERT ON TipoUsuario
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_tipo_usuario_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO TipoUsuario (nombre) VALUES ('PRINCIPAL');
+INSERT INTO TipoUsuario (nombre) VALUES ('TESORERIA');
+INSERT INTO TipoUsuario (nombre) VALUES ('EMPLEADO');
+
+//CRENAOD LA TABLA USUARIO
+
+CREATE TABLE Usuario (
+    id_empleado NUMBER REFERENCES Empleado(id_empleado) PRIMARY KEY,
+    nombre_usuario VARCHAR2(50) NOT NULL UNIQUE,
+	email VARCHAR2(50) NOT NULL,
+    contraseña VARCHAR2(100) NOT NULL,
+    id_tipo_usuario NUMBER REFERENCES TipoUsuario(id)
+);
+
+-- Insertar datos de ejemplo
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, id_tipo_usuario) VALUES (1, 'ADMIN', 'admin@gmail.com', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 1);
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, id_tipo_usuario) VALUES (2, 'ANA', 'anam@gmail.com', 'e82827b00b2ca8620beb37f879778c082b292a52270390cff35b6fe3157f4e8b', 2);
+INSERT INTO Usuario (id_empleado, nombre_usuario, email, contraseña, id_tipo_usuario) VALUES (3, 'PEDRO', 'pedror@gmail.com', '2702cb34ee041711b9df0c67a8d5c9de02110c80e3fc966ba8341456dbc9ef2b', 3);
+
+//CONTRASEÑA DE 'ADMIN' = admin
+//CONTRASEÑA DE 'ANA' = ana123
+//CONTRASEÑA DE 'PEDRO' = pedro123
+
+
+//Tabla de Logs de Sesiones
+
+CREATE SEQUENCE seq_log_sesion_id
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+CREATE TABLE LogSesion (
+    id NUMBER PRIMARY KEY,
+    id_usuario NUMBER REFERENCES Usuario(id_empleado),
+    fecha TIMESTAMP NOT NULL,
+    tipo VARCHAR2(50) CHECK (tipo IN ('ENTRADA', 'SALIDA')) NOT NULL,
+    estado VARCHAR2(20) CHECK (estado IN ('EXITOSO', 'FALLIDO')) NOT NULL
+);
+
+CREATE OR REPLACE TRIGGER trg_before_insert_log_sesion
+BEFORE INSERT ON LogSesion
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT seq_log_sesion_id.NEXTVAL INTO :NEW.id FROM dual;
+    END IF;
+END;
+
+INSERT INTO LogSesion (id_usuario, fecha, tipo, estado)
+VALUES (1, CAST(CURRENT_TIMESTAMP AS TIMESTAMP(0)), 'ENTRADA', 'EXITOSO');
+INSERT INTO LogSesion (id_usuario, fecha, tipo, estado)
+VALUES (2, CAST(CURRENT_TIMESTAMP AS TIMESTAMP(0)), 'SALIDA', 'FALLIDO');
+

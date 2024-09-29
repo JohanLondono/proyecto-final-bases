@@ -29,14 +29,14 @@ class PagoDAO:
         cursor = self.connection.cursor()
         try:
             query = """
-                INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, metodo_pago)
-                VALUES (:id_prestamo, :monto_pagado, :fecha_pago, :metodo_pago)
+                INSERT INTO Pago (id_prestamo, monto_pagado, fecha_pago, id_tipo_pago)
+                VALUES (:id_prestamo, :monto_pagado, :fecha_pago, :id_tipo_pago)
             """
             cursor.execute(query, {
                 'id_prestamo': pago.id_prestamo,
                 'monto_pagado': pago.monto_pagado,
                 'fecha_pago': pago.fecha_pago,
-                'metodo_pago': pago.metodo_pago
+                'id_tipo_pago': pago.id_tipo_pago
             })
             self.connection.commit()
             return True
@@ -60,9 +60,11 @@ class PagoDAO:
                 sp.id_empleado AS ID_EMPLEADO, 
                 p.monto_pagado AS MONTO_PAGADO, 
                 p.fecha_pago AS FECHA_PAGO, 
-                p.metodo_pago AS METODO_PAGO
+                tp.nombre AS METODO_PAGO
             FROM 
                 Pago p
+            JOIN 
+                TipoPago tp ON p.id_tipo_pago = tp.id
             JOIN 
                 Prestamo pr ON p.id_prestamo = pr.id
             JOIN 
@@ -92,9 +94,11 @@ class PagoDAO:
                 sp.id_empleado AS ID_EMPLEADO, 
                 p.monto_pagado AS MONTO_PAGADO, 
                 p.fecha_pago AS FECHA_PAGO, 
-                p.metodo_pago AS METODO_PAGO
+                tp.nombre AS METODO_PAGO
             FROM 
                 Pago p
+            JOIN 
+                TipoPago tp ON p.id_tipo_pago = tp.id
             JOIN 
                 Prestamo pr ON p.id_prestamo = pr.id
             JOIN 
@@ -113,7 +117,7 @@ class PagoDAO:
             print(f"Error al cargar los pagos del empleado con ID {id_empleado}: {e}")
             return []
 
-    def buscar_pagos(self, id_pago=None, id_prestamo=None, id_empleado=None, fecha_inicio=None, fecha_fin=None) -> List[PagoTablaDTO]:
+    def buscar_pagos(self, id_pago=None, id_prestamo=None, id_empleado=None, fecha_inicio=None, fecha_fin=None, id_tipo_pago=None) -> List[PagoTablaDTO]:
         """
         Busca pagos en función de varios filtros opcionales.
         """
@@ -124,9 +128,11 @@ class PagoDAO:
             sp.id_empleado AS ID_EMPLEADO, 
             p.monto_pagado AS MONTO_PAGADO, 
             p.fecha_pago AS FECHA_PAGO, 
-            p.metodo_pago AS METODO_PAGO
+            tp.nombre AS METODO_PAGO
         FROM 
             Pago p
+        JOIN 
+            TipoPago tp ON p.id_tipo_pago = tp.id
         JOIN 
             Prestamo pr ON p.id_prestamo = pr.id
         JOIN 
@@ -153,6 +159,9 @@ class PagoDAO:
         elif fecha_fin:
             consulta += " AND p.fecha_pago <= :4"
             parametros.append(fecha_fin)
+        elif id_tipo_pago:
+            consulta += " AND p.id_tipo_pago = :6"
+            parametros.append(id_tipo_pago)
 
         try:
             cursor = self.connection.cursor()

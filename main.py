@@ -23,13 +23,17 @@ from reportlab.platypus import Table, TableStyle
 from database import get_connection
 from database import create_sqlalchemy_engine
 from dao import SucursalDAO
-from dto import SucursalDTO
+from dto import SucursalSqlDTO
+from dto import SucursalTablaDTO
 from dao import EmpleadoDAO
-from dto import EmpleadoDTO
+from dto import EmpleadoSqlDTO
+from dto import EmpleadoTablaDTO
 from dao import UsuarioDAO
-from dto import UsuarioDTO
+from dto import UsuarioSqlDTO
+from dto import UsuarioTablaDTO
 from dao import SolicitudPrestamoDAO
-from dto import SolicitudPrestamoDTO
+from dto import SolicitudPrestamoSqlDTO
+from dto import SolicitudPrestamoTablaDTO
 from dao import PrestamoDAO
 from dto import PrestamoSqlDTO
 from dto import PrestamoTablaDTO
@@ -41,13 +45,22 @@ from dao import LogSesionDAO
 from dto import LogSesionSqlDTO
 from dto import LogSesionTablaDTO
 from dao import ReporteDAO
-
-SALARY_RANGES = {
-    "OPERARIO": 5000000,
-    "ADMINISTRATIVO": 7500000,
-    "EJECUTIVO": 10000000,
-    "OTROS": 6000000
-}
+from dto import MunicipioDTO
+from dao import MunicipioDAO
+from dto import DepartamentoDTO
+from dao import DepartamentoDAO
+from dto import TipoEstadoPrestamoDTO
+from dao import TipoEstadoPrestamoDAO
+from dto import TipoEstadoSolicitudDTO
+from dao import TipoEstadoSolicitudDAO
+from dto import TipoPagoDTO
+from dao import TipoPagoDAO
+from dto import TipoUsuarioDTO
+from dao import TipoUsuarioDAO
+from dto import TipoCargoDTO
+from dao import TipoCargoDAO
+from dto import TipoPeriodoDTO
+from dao import TipoPeriodoDAO
 
 class LoginWindow(QWidget):
     def __init__(self):
@@ -128,10 +141,12 @@ class LoginWindow(QWidget):
 
 
 class BankApp(QMainWindow):
-    def __init__(self, usuario: UsuarioDTO):
+    def __init__(self, usuario: UsuarioTablaDTO):
         super().__init__()
         self.sub_windows = []  # Lista para almacenar ventanas superpuestas
         self.usuario = usuario
+        self.tipo_cargo_salarios = {}
+        self.tipo_periodo_intereses = {}
         self.connection = get_connection()
         self.engine = create_sqlalchemy_engine()
         self.sucursal_dao = SucursalDAO(self.connection)
@@ -142,6 +157,16 @@ class BankApp(QMainWindow):
         self.pago_dao = PagoDAO(self.connection)
         self.log_sesion_dao = LogSesionDAO(self.connection)
         self.reporte_dao = ReporteDAO(self.engine)
+        self.departamento_dao = DepartamentoDAO(self.connection)
+        self.municipio_dao = MunicipioDAO(self.connection)
+        self.tipo_estado_solicitud_dao = TipoEstadoSolicitudDAO(self.connection)
+        self.tipo_estado_prestamo_dao = TipoEstadoPrestamoDAO(self.connection)
+        self.tipo_pago_dao = TipoPagoDAO(self.connection)
+        self.tipo_usuario_dao = TipoUsuarioDAO(self.connection)
+        self.tipo_cargo_dao = TipoCargoDAO(self.connection)
+        self.tipo_periodo_dao = TipoPeriodoDAO(self.connection)
+
+
         
         self.setWindowTitle("Sistema de Gestión Bancaria")
 
@@ -234,7 +259,7 @@ class BankApp(QMainWindow):
         transactions_menu.addAction(loan_payments_action)
 
         reports_menu = self.menu_bar.addMenu("Reportes y Consultas")
-        morosos_report_action = QAction("Reporte de Morosos", self)
+        morosos_report_action = QAction("Reportes", self)
         morosos_report_action.triggered.connect(self.show_report_selection_window)
         reports_menu.addAction(morosos_report_action)
 
@@ -329,13 +354,17 @@ class BankApp(QMainWindow):
         search_layout.addWidget(QLabel("Nombre:"))
         search_layout.addWidget(self.search_name_input)
 
-        self.search_department_input = QLineEdit()
+        # Cambiar el campo de Departamento a un QComboBox
+        self.department_combo = QComboBox()
+        self.cargar_departamentos()  # Cargar los departamentos al iniciar
+        self.department_combo.currentIndexChanged.connect(self.cargar_municipios)
         search_layout.addWidget(QLabel("Departamento:"))
-        search_layout.addWidget(self.search_department_input)
+        search_layout.addWidget(self.department_combo)
 
-        self.search_municipality_input = QLineEdit()
+        # Cambiar el campo de Municipio a un QComboBox
+        self.municipality_combo = QComboBox()
         search_layout.addWidget(QLabel("Municipio:"))
-        search_layout.addWidget(self.search_municipality_input)
+        search_layout.addWidget(self.municipality_combo)
 
         self.search_button = QPushButton("Buscar")
         self.search_button.clicked.connect(self.search_branches)
@@ -345,8 +374,8 @@ class BankApp(QMainWindow):
 
         # Crear la tabla para mostrar sucursales
         self.branch_table = QTableWidget()
-        self.branch_table.setColumnCount(6)
-        self.branch_table.setHorizontalHeaderLabels(["Código", "Nombre", "Departamento", "Municipio", "Director", "Presupuesto"])
+        self.branch_table.setColumnCount(5)
+        self.branch_table.setHorizontalHeaderLabels(["Código", "Nombre", "Departamento", "Municipio", "Presupuesto"])
         self.branch_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         self.layout.addWidget(self.branch_table)
@@ -363,6 +392,78 @@ class BankApp(QMainWindow):
         self.delete_branch_button = QPushButton("Eliminar Sucursal")
         self.delete_branch_button.clicked.connect(self.delete_branch)
         self.layout.addWidget(self.delete_branch_button)
+
+    def cargar_departamentos(self):
+        # Obtener la lista de departamentos desde la base de datos
+        departamentos = self.departamento_dao.cargar_todos_los_departamentos()
+
+        # Limpiar el combo box antes de agregar los nuevos elementos
+        self.department_combo.clear()
+
+        # Agregar una opción predeterminada
+        self.department_combo.addItem("")
+
+        # Rellenar el combo box con los departamentos
+        for departamento in departamentos:
+            self.department_combo.addItem(departamento.nombre, departamento.id)
+
+    def cargar_municipios(self):
+        # Obtener el ID del departamento seleccionado
+        departamento_id = self.department_combo.currentData()
+
+        # Si no hay un departamento seleccionado, limpiar el combo de municipios
+        if not departamento_id:
+            self.municipality_combo.clear()
+            return
+
+        # Obtener los municipios correspondientes al departamento seleccionado
+        municipios = self.municipio_dao.obtener_municipios_por_departamento(departamento_id)
+
+        # Limpiar el combo box de municipios
+        self.municipality_combo.clear()
+
+        # Agregar una opción predeterminada
+        self.municipality_combo.addItem("")
+
+        # Rellenar el combo box con los municipios
+        for municipio in municipios:
+            self.municipality_combo.addItem(municipio.nombre, municipio.id)
+            
+    def cargar_departamentos2(self):
+        # Obtener la lista de departamentos desde la base de datos
+        departamentos = self.departamento_dao.cargar_todos_los_departamentos()
+
+        # Limpiar el combo box antes de agregar los nuevos elementos
+        self.department_combo2.clear()
+
+        # Agregar una opción predeterminada
+        self.department_combo2.addItem("Selecciona un Departamento", "")
+
+        # Rellenar el combo box con los departamentos
+        for departamento in departamentos:
+            self.department_combo2.addItem(departamento.nombre, departamento.id)
+
+    def cargar_municipios2(self):
+        # Obtener el ID del departamento seleccionado
+        departamento_id = self.department_combo2.currentData()
+
+        # Si no hay un departamento seleccionado, limpiar el combo de municipios
+        if not departamento_id:
+            self.municipality_combo2.clear()
+            return
+
+        # Obtener los municipios correspondientes al departamento seleccionado
+        municipios = self.municipio_dao.obtener_municipios_por_departamento(departamento_id)
+
+        # Limpiar el combo box de municipios
+        self.municipality_combo2.clear()
+
+        # Agregar una opción predeterminada
+        self.municipality_combo2.addItem("Seleccione un Municipio")
+
+        # Rellenar el combo box con los municipios
+        for municipio in municipios:
+            self.municipality_combo2.addItem(municipio.nombre, municipio.id)
 
     def open_new_branch_form(self):
         # Crear una nueva ventana para el formulario de sucursales
@@ -383,21 +484,19 @@ class BankApp(QMainWindow):
         self.branch_name_input.textChanged.connect(self.transform_to_uppercase_sucursal)
         form_layout.addRow("Nombre:", self.branch_name_input)
 
-        self.department_input = QLineEdit()
-        self.department_input.textChanged.connect(self.transform_to_uppercase_sucursal)
-        form_layout.addRow("Departamento:", self.department_input)
+        # Cambiar el campo de Departamento a un QComboBox
+        self.department_combo2 = QComboBox()
+        self.cargar_departamentos2()  # Cargar los departamentos al iniciar
+        self.department_combo2.currentIndexChanged.connect(self.cargar_municipios2)
+        form_layout.addRow("Departamento:", self.department_combo2)
 
-        self.municipality_input = QLineEdit()
-        self.municipality_input.textChanged.connect(self.transform_to_uppercase_sucursal)
-        form_layout.addRow("Municipio:", self.municipality_input)
-
-        self.director_input = QLineEdit()
-        self.director_input.textChanged.connect(self.transform_to_uppercase_sucursal)
-        form_layout.addRow("Director:", self.director_input)
+        # Cambiar el campo de Municipio a un QComboBox
+        self.municipality_combo2 = QComboBox()
+        self.municipality_combo2.addItem("Seleccione un Municipio")
+        form_layout.addRow("Municipio:", self.municipality_combo2)
 
         self.budget_input = QLineEdit()
         max_value = sys.float_info.max  # Obtener el valor máximo posible para un float en Python
-
         validator = QDoubleValidator(0, max_value, 2, self)  # Cambia el rango según tus necesidades
         validator.setNotation(QDoubleValidator.StandardNotation)  # Usa notación estándar
         self.budget_input.setValidator(validator)
@@ -413,9 +512,6 @@ class BankApp(QMainWindow):
     def transform_to_uppercase_sucursal(self):
         # Transformar texto en ambos campos a mayúsculas
         self.branch_name_input.setText(self.branch_name_input.text().upper())
-        self.department_input.setText(self.department_input.text().upper())
-        self.municipality_input.setText(self.municipality_input.text().upper())
-        self.director_input.setText(self.director_input.text().upper())
 
     def cargar_sucursal_combo(self):
         # Obtener la lista de sucursales desde el DAO
@@ -453,22 +549,19 @@ class BankApp(QMainWindow):
             self.branch_table.setItem(i, 1, QTableWidgetItem(branch.nombre))
             self.branch_table.setItem(i, 2, QTableWidgetItem(branch.departamento))
             self.branch_table.setItem(i, 3, QTableWidgetItem(branch.municipio))
-            self.branch_table.setItem(i, 4, QTableWidgetItem(branch.director))
-            self.branch_table.setItem(i, 5, QTableWidgetItem(str(branch.presupuesto)))
+            self.branch_table.setItem(i, 4, QTableWidgetItem(str(branch.presupuesto)))
 
     def save_branch(self):
         code = self.branch_code_input.text()
         name = self.branch_name_input.text()
-        department = self.department_input.text()
-        municipality = self.municipality_input.text()
-        director = self.director_input.text()
+        municipality = self.municipality_combo2.currentData()
         budget = self.budget_input.text()
 
-        if not code or not name or not department or not municipality or not director or not budget:
+        if not code or not name or not municipality or not budget:
             QMessageBox.warning(self, "Error", "Todos los campos son obligatorios")
             return
 
-        sucursal = SucursalDTO(code, name, department, municipality, director, budget)
+        sucursal = SucursalSqlDTO(code, municipality, name, budget)
         try:
             self.sucursal_dao.insertar_sucursal(sucursal)
             QMessageBox.information(self, "Éxito", "Sucursal guardada correctamente")
@@ -501,8 +594,8 @@ class BankApp(QMainWindow):
     def search_branches(self):
         code = self.search_code_input.text().strip()
         name = self.search_name_input.text().strip().upper()
-        department = self.search_department_input.text().strip().upper()
-        municipality = self.search_municipality_input.text().strip().upper()
+        department = self.department_combo.currentData()
+        municipality = self.municipality_combo.currentData()
 
         # Llamar al DAO para buscar las sucursales
         branches = self.sucursal_dao.buscar_sucursales(code, name, department, municipality)
@@ -515,8 +608,7 @@ class BankApp(QMainWindow):
             self.branch_table.setItem(i, 1, QTableWidgetItem(branch.nombre))
             self.branch_table.setItem(i, 2, QTableWidgetItem(branch.departamento))
             self.branch_table.setItem(i, 3, QTableWidgetItem(branch.municipio))
-            self.branch_table.setItem(i, 4, QTableWidgetItem(branch.director))
-            self.branch_table.setItem(i, 5, QTableWidgetItem(str(branch.presupuesto)))
+            self.branch_table.setItem(i, 4, QTableWidgetItem(str(branch.presupuesto)))
 
         # Actualizar el ComboBox con los nuevos registros
         self.branch_combo.clear()
@@ -563,8 +655,8 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.search_branch_input)
 
         self.search_position_combo = QComboBox()
-        self.search_position_combo.addItems(["", "OPERARIO", "ADMINISTRATIVO", "EJECUTIVO", "OTROS"])
-        search_layout.addWidget(QLabel("Puesto:"))
+        self.cargar_tipo_cargo_empleados_combo1()
+        search_layout.addWidget(QLabel("Cargo:"))
         search_layout.addWidget(self.search_position_combo)
 
         # Botón para buscar empleados
@@ -638,12 +730,11 @@ class BankApp(QMainWindow):
         form_layout.addRow("Apellido:", self.employee_lastname_input)
 
 
-        # Cambiar el campo de Puesto a un QComboBox
+        # Cambiar el campo de Cargo a un QComboBox
         self.position_combo = QComboBox()
-        self.position_combo.addItem("Seleccione un Puesto")
-        self.position_combo.addItems(["OPERARIO", "ADMINISTRATIVO", "EJECUTIVO", "OTROS"])
+        self.cargar_tipo_cargo_empleados_combo2()
         self.position_combo.currentIndexChanged.connect(self.update_salary)
-        form_layout.addRow("Puesto:", self.position_combo)
+        form_layout.addRow("Cargo:", self.position_combo)
 
         self.salary_input = QLineEdit()
         form_layout.addRow("Salario:", self.salary_input)
@@ -681,14 +772,57 @@ class BankApp(QMainWindow):
             display_text = f"{empleado_nombre} {empleado_apellido} - {empleado_id}"
             self.employee_combo.addItem(display_text, empleado_id)
 
-    def update_salary(self):
-    # Obtener el puesto seleccionado y actualizar el salario automáticamente
-        position = self.position_combo.currentText()
-        max_salary = SALARY_RANGES.get(position, 0)
-
-        # Formatear el salario para que use solo el punto como separador decimal
-        formatted_salary = f"{max_salary}"
+    def cargar_tipo_cargo_empleados_combo1(self):
+        # Obtener la lista de tipos de cargo desde el DAO
+        tipos_cargo = self.tipo_cargo_dao.cargar_todos_los_tipo_cargos()
         
+        # Limpiar el combo box antes de agregar los nuevos elementos
+        self.search_position_combo.clear()
+
+        # Agregar una opción predeterminada
+        self.search_position_combo.addItem("")
+
+        # Recorrer la lista de objetos TipoCargoDTO e insertar los datos en el combo box
+        for tipo_cargo in tipos_cargo:
+            cargo_id = tipo_cargo.id  # Asignar el ID del cargo
+            cargo_nombre = tipo_cargo.nombre  # Asignar el nombre del cargo
+            
+            # Agregar el cargo al combo box con el nombre como texto y el ID como valor
+            self.search_position_combo.addItem(cargo_nombre, cargo_id)
+
+    def cargar_tipo_cargo_empleados_combo2(self):
+        # Obtener la lista de tipos de cargo desde el DAO
+        tipos_cargo = self.tipo_cargo_dao.cargar_todos_los_tipo_cargos()
+        
+        # Limpiar el combo box antes de agregar los nuevos elementos
+        self.position_combo.clear()
+
+        # Agregar una opción predeterminada
+        self.position_combo.addItem("Selecciona un cargo", "")
+
+        # Recorrer la lista de objetos TipoCargoDTO e insertar los datos en el combo box
+        for tipo_cargo in tipos_cargo:
+            cargo_id = tipo_cargo.id  # Asignar el ID del cargo
+            cargo_nombre = tipo_cargo.nombre  # Asignar el nombre del cargo
+            cargo_salario = tipo_cargo.salario  # Asignar el salario del cargo
+
+            # Guardar el salario en el diccionario con el nombre del cargo como clave
+            self.tipo_cargo_salarios[cargo_nombre] = cargo_salario
+            
+            # Agregar el cargo al combo box con el nombre como texto y el ID como valor
+            self.position_combo.addItem(cargo_nombre, cargo_id)
+
+    def update_salary(self):
+        # Obtener el nombre del cargo seleccionado en el combo box
+        selected_cargo = self.position_combo.currentText()
+
+        # Obtener el salario del diccionario, usando el nombre del cargo como clave
+        salario = self.tipo_cargo_salarios.get(selected_cargo, 0)
+
+        # Formatear el salario (por ejemplo, para usar un solo punto decimal)
+        formatted_salary = f"{salario:.2f}"
+
+        # Actualizar el campo de salario en la interfaz
         self.salary_input.setText(formatted_salary)
 
 
@@ -697,11 +831,10 @@ class BankApp(QMainWindow):
         emp_id = self.employee_id_input.text()
         name = self.employee_name_input.text()
         lastname = self.employee_lastname_input.text()
-        position = self.position_combo.currentText()
-        salary = self.salary_input.text()
+        position = self.position_combo.currentData()
 
 
-        if not emp_id or not name or not lastname or not branch_id or position == "Seleccione un Puesto" or not salary:
+        if not emp_id or not name or not lastname or not branch_id or not position:
             QMessageBox.warning(self, "Error", "Todos los campos son obligatorios")
             return
         
@@ -709,7 +842,7 @@ class BankApp(QMainWindow):
             QMessageBox.warning(self, "Error", "El ID del Empleado debe ser un número")
             return
         
-        empleado = EmpleadoDTO(emp_id, name, lastname, branch_id, position, salary)
+        empleado = EmpleadoSqlDTO(emp_id, name, lastname, branch_id, position)
     
         # Conectar a la base de datos y guardar el empleado
         
@@ -755,7 +888,7 @@ class BankApp(QMainWindow):
         name = self.search_name_input.text().strip().upper()
         lastname = self.search_lastname_input.text().strip().upper()
         branch_code = self.search_branch_input.text().strip().upper()
-        position = self.search_position_combo.currentText()
+        position = self.search_position_combo.currentData()
 
         employees = self.empleado_dao.buscar_empleados(emp_id, name, lastname, branch_code, position)
         self.employee_table.setRowCount(len(employees))
@@ -808,7 +941,7 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.search_email_input)
 
         self.search_rol_combo = QComboBox()
-        self.search_rol_combo.addItems(["", "PRINCIPAL", "TESORERIA", "EMPLEADO"])
+        self.cargar_tipo_usuarios_combo1()
         search_layout.addWidget(QLabel("Rol:"))
         search_layout.addWidget(self.search_rol_combo)
 
@@ -875,7 +1008,7 @@ class BankApp(QMainWindow):
 
         self.role_combo = QComboBox()
         self.role_combo.addItem("Seleccione un Rol")
-        self.role_combo.addItems(["TESORERIA", "EMPLEADO"])
+        self.cargar_tipo_usuarios_combo2()
         form_layout.addRow("Rol:", self.role_combo)
 
         self.save_button = QPushButton("Guardar")
@@ -905,24 +1038,59 @@ class BankApp(QMainWindow):
             display_text = f"{usuario_email}-{usuario_nombre}-{usuario_rol}-{usuario_id}"
             self.user_combo.addItem(display_text, usuario_id)
 
+    def cargar_tipo_usuarios_combo1(self):
+        tipo_usuarios = self.tipo_usuario_dao.cargar_todos_los_tipos_usuarios()
+
+        self.search_rol_combo.clear()
+        self.search_rol_combo.addItem("")  # Opción predeterminada
+        # Recorrer la lista de objetos EmpleadoDTO e insertar los datos en el combo box
+        for tipo_usuario in tipo_usuarios:
+            tipo_usuario_id = tipo_usuario.id  # Asignar el ID
+            tipo_usuario_nombre = tipo_usuario.nombre  # Asignar el nombre
+
+            # Agregar el elemento al combo box con el formato deseado
+            display_text = f"{tipo_usuario_nombre}"
+            self.search_rol_combo.addItem(display_text, tipo_usuario_id)
+
+
+    def cargar_tipo_usuarios_combo2(self):
+        tipo_usuarios = self.tipo_usuario_dao.cargar_todos_los_tipos_usuarios()
+        self.role_combo.clear()
+        self.role_combo.addItem("Seleccionar un Tipo de Usuario")  # Opción predeterminada
+        # Recorrer la lista de objetos EmpleadoDTO e insertar los datos en el combo box
+        for tipo_usuario in tipo_usuarios:
+            tipo_usuario_id = tipo_usuario.id  # Asignar el ID
+            tipo_usuario_nombre = tipo_usuario.nombre  # Asignar el nombre
+
+            # Agregar el elemento al combo box con el formato deseado
+            display_text = f"{tipo_usuario_nombre}"
+            self.role_combo.addItem(display_text, tipo_usuario_id)
+
     def save_user(self):
         user_id = self.employee_combo.currentData()  # Obtener el ID del empleado seleccionado
         username = self.username_input.text()
         email = self.email_input.text()
         password = self.password_input.text()
-        role = self.role_combo.currentText()
+        rolestring = self.role_combo.currentText()
+        role = self.role_combo.currentData()
 
-        if not user_id or not username or not email or not password or role == "Seleccione un Rol":
+        if not user_id or not username or not email or not password or not role:
             QMessageBox.warning(self, "Error", "Todos los campos son obligatorios")
             return
         
         password_encrypted = self.hash_password(password)
 
-        usuario = UsuarioDTO(user_id, username.upper(), email, password_encrypted, role)
+        usuario = UsuarioSqlDTO(user_id, username.upper(), email, password_encrypted, role)
 
         try:
+            if rolestring == "PRINCIPAL":
+                bandera = self.usuario_dao.verificar_administrador_existe()
+                if bandera:
+                    self.user_form_window.close()
+                    QMessageBox.warning(self, "Error", "Solo puede haber un administrador")
+                    return
+            
             bandera = self.usuario_dao.insertar_usuario(usuario)
-
             if bandera:
                 QMessageBox.information(self, "Éxito", "Usuario guardado correctamente")
                 self.user_form_window.close()
@@ -931,7 +1099,9 @@ class BankApp(QMainWindow):
             else:
                 self.user_form_window.close()
                 QMessageBox.warning(self, "Error", "El Empleado ya tiene un Usuario")
+    
         except Exception as e:
+            self.user_form_window.close()
             QMessageBox.warning(self, "Error", f"Error al guardar el usuario: {str(e)}")
             
     def delete_user(self):
@@ -960,7 +1130,7 @@ class BankApp(QMainWindow):
         emp_id = self.search_id_empleado_input.text().strip()
         name = self.search_name_input.text().strip().upper()
         email = self.search_email_input.text().strip().upper()
-        rol = self.search_rol_combo.currentText()
+        rol = self.search_rol_combo.currentData()
 
         users = self.usuario_dao.buscar_usuarios(emp_id, name, email, rol)
         self.user_table.setRowCount(len(users))
@@ -1003,8 +1173,7 @@ class BankApp(QMainWindow):
 
         # Combobox para seleccionar el estado
         self.status_combo = QComboBox()
-        self.status_combo.addItem("Seleccionar el Estado de la Solicitud", "")  # Opción predeterminada
-        self.status_combo.addItems(["APROBADA", "CANCELADA", "NO_APROBADA", "EN_ESTUDIO"])
+        self.cargar_tipo_estado_solicitud_combo1()
         self.layout.addWidget(self.status_combo)
 
         # Campos de búsqueda
@@ -1023,7 +1192,7 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.search_employee_input)
 
         self.search_estado_combo = QComboBox()
-        self.search_estado_combo.addItems(["", "PENDIENTE", "APROBADA", "CANCELADA", "NO_APROBADA"])
+        self.cargar_tipo_estado_solicitud_combo2()
         search_layout.addWidget(QLabel("Estado:"))
         search_layout.addWidget(self.search_estado_combo)
 
@@ -1093,11 +1262,37 @@ class BankApp(QMainWindow):
             display_text = f"{solicitud_id} - {solicitud_estado}"
             self.loan_request_combo.addItem(display_text, solicitud_id)
 
+    def cargar_tipo_estado_solicitud_combo1(self):
+        tipo_estado_solicitud = self.tipo_estado_solicitud_dao.cargar_todos_los_tipos_estados_solicitud()
         
+        self.status_combo.clear()
+
+        self.status_combo.addItem("Seleccionar el Estado de la Solicitud", "")
+
+        for tipo_estado in tipo_estado_solicitud:
+            tipo_estado_id = tipo_estado.id  # Asignar el ID del cargo
+            tipo_estado_nombre = tipo_estado.nombre  # Asignar el nombre del cargo
+
+            self.status_combo.addItem(tipo_estado_nombre, tipo_estado_id)
+
+    def cargar_tipo_estado_solicitud_combo2(self):
+        tipo_estado_solicitud = self.tipo_estado_solicitud_dao.cargar_todos_los_tipos_estados_solicitud()
+        
+        self.search_estado_combo.clear()
+
+        self.search_estado_combo.addItem("")
+
+        for tipo_estado in tipo_estado_solicitud:
+            tipo_estado_id = tipo_estado.id  # Asignar el ID del cargo
+            tipo_estado_nombre = tipo_estado.nombre  # Asignar el nombre del cargo
+
+            self.search_estado_combo.addItem(tipo_estado_nombre, tipo_estado_id)
+
+
     def search_loan_requests(self):
         loan_request_id = self.search_loan_request_id_input.text().strip()
         employee_id = self.search_employee_input.text().strip()
-        estado = self.search_estado_combo.currentText()  # Obtener el texto seleccionado en el combobox
+        estado = self.search_estado_combo.currentData()  # Obtener el texto seleccionado en el combobox
         start_date = self.start_date_input.date().toPyDate() if self.start_date_checkbox.isChecked() else None
         end_date = self.end_date_input.date().toPyDate() if self.end_date_checkbox.isChecked() else None
 
@@ -1124,17 +1319,19 @@ class BankApp(QMainWindow):
     def accept_changes(self):
         # Método para aceptar los cambios (aprobar, cancelar, no aprobado)
         selected_request_id = self.loan_request_combo.currentData()
-        new_status = self.status_combo.currentText()
+        new_status_str = self.status_combo.currentText()
+        new_status = self.status_combo.currentData()
 
         if not selected_request_id:
             QMessageBox.warning(self, "Error", "No se ha seleccionado ninguna solicitud")
             return
 
-        if new_status == "Seleccionar el Estado de la Solicitud":
+        if not new_status:
             QMessageBox.warning(self, "Error", "Debe seleccionar un estado")
             return
 
         try:
+
             # Obtener el estado actual de la solicitud
             solicitud = self.solicitud_prestamo_dao.cargar_solicitud_por_id(selected_request_id)
             if not solicitud:
@@ -1146,7 +1343,7 @@ class BankApp(QMainWindow):
             periodo = solicitud.periodo
             interes = solicitud.interes
 
-            if new_status == "APROBADA":
+            if new_status_str == "APROBADA":
                 if current_status != "PENDIENTE":
                     QMessageBox.warning(self, "Error", "Solo se pueden aprobar solicitudes pendientes")
                     return
@@ -1154,16 +1351,17 @@ class BankApp(QMainWindow):
                 fecha_aprobacion = QDateTime.currentDateTime().toPyDateTime()
                 fecha_vencimiento = fecha_aprobacion + timedelta(days=periodo*30)
                 
-                #Actualizar la fehca de vencimiento cuando se apruba la solciitud mas los meses del periodo
                 self.solicitud_prestamo_dao.actualizar_estado_solicitud(selected_request_id, new_status)
 
                 monto_total = monto + monto * (interes / 100)
 
+                id_tipo_prestamo_activo = self.tipo_estado_prestamo_dao.obtener_id_tipo_estado_prestamo_por_nombre('ACTIVO')
+
                 # Crear el registro en la tabla Prestamo
-                prestamo = PrestamoSqlDTO(0, selected_request_id, fecha_aprobacion, fecha_vencimiento, monto_total, "")
+                prestamo = PrestamoSqlDTO(0, selected_request_id, fecha_aprobacion, fecha_vencimiento, monto_total, id_tipo_prestamo_activo)
                 self.prestamo_dao.insertar_prestamo(prestamo)
 
-            elif new_status == "CANCELADA":
+            elif new_status_str == "CANCELADA":
                 if current_status != "APROBADA":
                     QMessageBox.warning(self, "Error", "Solo se pueden cancelar solicitudes aprobadas")
                     return
@@ -1171,20 +1369,22 @@ class BankApp(QMainWindow):
                 self.solicitud_prestamo_dao.cancelar_solicitud_prestamo_por_id(selected_request_id)
                 self.prestamo_dao.cancelar_prestamo_por_id_solicitud(selected_request_id)
 
-            elif new_status == "EN_ESTUDIO":
+            elif new_status_str == "EN_ESTUDIO":
                 if current_status != "PENDIENTE":
                     QMessageBox.warning(self, "Error", "Solo se pueden estudiar solicitudes pendientes")
                     return
                 # Actualizar el estado a "NO_APROBADA"
                 self.solicitud_prestamo_dao.actualizar_estado_solicitud(selected_request_id, new_status)
 
-            elif new_status == "NO_APROBADA":
+            elif new_status_str == "NO_APROBADA":
                 if current_status != "PENDIENTE":
                     QMessageBox.warning(self, "Error", "Solo se pueden rechazar solicitudes pendientes")
                     return
                 # Actualizar el estado a "NO_APROBADA"
                 self.solicitud_prestamo_dao.actualizar_estado_solicitud(selected_request_id, new_status)
-
+            elif new_status_str == "PENDIENTE":
+                QMessageBox.warning(self, "Error", "No puede Colocar Solicitudes Pendientes")
+                return
             QMessageBox.information(self, "Éxito", "Estado actualizado correctamente")
             self.load_loan_requests()  # Recargar la tabla
             self.cargar_solicitudes_prestamos_combo()  # Recargar el combobox
@@ -1206,7 +1406,7 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.search_loan_request_id_input)
 
         self.search_estado_combo = QComboBox()
-        self.search_estado_combo.addItems(["", "PENDIENTE", "APROBADA", "CANCELADA", "NO_APROBADA"])
+        self.cargar_tipo_estado_solicitud_combo2()
         search_layout.addWidget(QLabel("Estado:"))
         search_layout.addWidget(self.search_estado_combo)
 
@@ -1267,7 +1467,7 @@ class BankApp(QMainWindow):
     def search_loan_requests_empleado(self):
         loan_request_id = self.search_loan_request_id_input.text().strip()
         employee_id = self.usuario.id_empleado
-        estado = self.search_estado_combo.currentText()  # Obtener el texto seleccionado en el combobox
+        estado = self.search_estado_combo.currentData()  # Obtener el texto seleccionado en el combobox
         start_date = self.start_date_input.date().toPyDate() if self.start_date_checkbox.isChecked() else None
         end_date = self.end_date_input.date().toPyDate() if self.end_date_checkbox.isChecked() else None
 
@@ -1300,7 +1500,7 @@ class BankApp(QMainWindow):
 
         # Campo para período en meses
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["Seleccione un Período", "24", "36", "48", "60", "72"])
+        self.cargar_tipo_periodo_combo()
         self.period_combo.currentIndexChanged.connect(self.update_interest)
         form_layout.addRow("Período (meses):", self.period_combo)
 
@@ -1316,51 +1516,53 @@ class BankApp(QMainWindow):
         self.loan_request_employee_form.setLayout(form_layout)
         self.loan_request_employee_form.show()
 
+    def cargar_tipo_periodo_combo(self):
+        tipo_periodos = self.tipo_periodo_dao.cargar_todos_los_tipo_periodos()
+        
+        self.period_combo.clear()
+
+        self.period_combo.addItem("Seleccione un Período")
+
+        for tipo_periodo in tipo_periodos:
+            tipo_periodo_id = tipo_periodo.id 
+            tipo_periodo_meses = tipo_periodo.meses 
+            tipo_periodo_interes = tipo_periodo.interes 
+            # Guardar los interes en el diccionario con el periodo en meses de la solicitud
+            self.tipo_periodo_intereses[str(tipo_periodo_meses)] = tipo_periodo_interes
+            
+            self.period_combo.addItem(str(tipo_periodo_meses), tipo_periodo_id)
+
+
     def update_interest(self):
-        # Calcular el interés basado en el período
-        period = self.period_combo.currentText()
-        interest_rate = {
-            "24": 7,
-            "36": 7.5,
-            "48": 8,
-            "60": 8.3,
-            "72": 8.6
-        }.get(period, 0)
-        self.interest_input.setText(f'{interest_rate}')
+        selected_periodo = self.period_combo.currentText()
+  
+        interes = self.tipo_periodo_intereses.get(selected_periodo, 0)
+
+        formatted_interes = f"{interes:.1f}"
+
+        self.interest_input.setText(formatted_interes)
 
     def save_loan_request(self):
         monto = self.amount_input.text()
-        periodo = self.period_combo.currentText()
-        interes = self.interest_input.text()
+        periodo = self.period_combo.currentData()
 
-
-        if not monto or periodo == "Seleccione un Período":
+        if not monto or not periodo:
             QMessageBox.warning(self, "Error", "Todos los campos son obligatorios")
             return
         
         empleado = self.empleado_dao.obtener_empleado_por_id(self.usuario.id_empleado)
+        cargo = self.tipo_cargo_dao.obtener_tipo_cargo_por_nombre(empleado.puesto)
+        tope_salario = cargo.tope_salario
 
-        if empleado.puesto == "OPERARIO":
-            if float(monto) > 10000000:
-                QMessageBox.warning(self, "Error", "Su Capacidad Maxima de Prestamo es de 10000000$")
-                return       
-        elif empleado.puesto == "ADMINISTRATIVO":
-            if float(monto) > 15000000:
-                QMessageBox.warning(self, "Error", "Su Capacidad Maxima de Prestamo es de 15000000$")
-                return   
-        elif empleado.puesto == "EJECUTIVO":
-            if float(monto) > 20000000:
-                QMessageBox.warning(self, "Error", "Su Capacidad Maxima de Prestamo es de 20000000$")
+        if float(monto) > tope_salario:
+                QMessageBox.warning(self, "Error", "Su Capacidad Maxima de Prestamo es de: " + str(tope_salario))
                 return 
-        else:
-            if float(monto) > 12000000:
-                QMessageBox.warning(self, "Error", "Su Capacidad Maxima de Prestamo es de 12000000$")
-                return 
-
+       
         fecha_actual = datetime.now()
         fecha_actual = fecha_actual.strftime('%d-%m-%Y %H:%M:%S')
         
-        solicitud = SolicitudPrestamoDTO(0, self.usuario.id_empleado, monto, periodo, interes, fecha_actual, "PENDIENTE")    
+        id_tipo_solicitud_pendiente = self.tipo_estado_solicitud_dao.obtener_id_tipo_estado_solicitud_por_nombre('PENDIENTE')
+        solicitud = SolicitudPrestamoSqlDTO(0, self.usuario.id_empleado, monto, periodo, fecha_actual, id_tipo_solicitud_pendiente)    
         # Conectar a la base de datos y guardar el empleado
         
         try:
@@ -1404,7 +1606,7 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.search_employee_input)
 
         self.search_estado_combo = QComboBox()
-        self.search_estado_combo.addItems(["", "ACTIVO", "CANCELADO", "PAGADO", "MORA"])
+        self.cargar_tipo_estado_prestamo_combo()
         search_layout.addWidget(QLabel("Estado:"))
         search_layout.addWidget(self.search_estado_combo)
 
@@ -1429,6 +1631,19 @@ class BankApp(QMainWindow):
         self.accept_button = QPushButton("Pagar Cuota")
         self.accept_button.clicked.connect(self.pagar_cuota)
         self.layout.addWidget(self.accept_button)
+
+    def cargar_tipo_estado_prestamo_combo(self):
+        tipo_estado_prestamo = self.tipo_estado_prestamo_dao.cargar_todos_los_tipos_estados_prestamo()
+        
+        self.search_estado_combo.clear()
+
+        self.search_estado_combo.addItem("")
+
+        for tipo_estado in tipo_estado_prestamo:
+            tipo_estado_id = tipo_estado.id  # Asignar el ID del cargo
+            tipo_estado_nombre = tipo_estado.nombre  # Asignar el nombre del cargo
+
+            self.search_estado_combo.addItem(tipo_estado_nombre, tipo_estado_id)
 
     def load_loans(self):
         
@@ -1467,7 +1682,7 @@ class BankApp(QMainWindow):
         id_prestamo = self.search_loans_id_input.text()
         id_solicitud = self.search_solicitud_input.text()
         id_empleado = self.search_employee_input.text()
-        estado = self.search_estado_combo.currentText()
+        estado = self.search_estado_combo.currentData()
 
         # Construir la consulta SQL dinámica basada en los filtros aplicados
         prestamos = self.prestamo_dao.buscar_prestamos(id_prestamo, id_solicitud, id_empleado, estado)
@@ -1522,7 +1737,7 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.search_solicitud_input)
 
         self.search_estado_combo = QComboBox()
-        self.search_estado_combo.addItems(["", "ACTIVO", "CANCELADO", "PAGADO", "MORA"])
+        self.cargar_tipo_estado_prestamo_combo()
         search_layout.addWidget(QLabel("Estado:"))
         search_layout.addWidget(self.search_estado_combo)
 
@@ -1585,7 +1800,7 @@ class BankApp(QMainWindow):
         id_prestamo = self.search_loans_id_input.text()
         id_solicitud = self.search_solicitud_input.text()
         id_empleado = self.usuario.id_empleado
-        estado = self.search_estado_combo.currentText()
+        estado = self.search_estado_combo.currentData()
 
         # Construir la consulta SQL dinámica basada en los filtros aplicados
         prestamos = self.prestamo_dao.buscar_prestamos(id_prestamo, id_solicitud, id_empleado, estado)
@@ -1734,8 +1949,9 @@ class BankApp(QMainWindow):
         self.label_metodo = QLabel("Método de pago:")
         layout.addWidget(self.label_metodo)
 
-        self.entry_metodo = QLineEdit()
-        layout.addWidget(self.entry_metodo)
+        self.search_metodo_combo = QComboBox()
+        self.cargar_tipo_pagos_combo2()
+        layout.addWidget(self.search_metodo_combo)
 
         self.boton_pagar = QPushButton("Pagar")
         layout.addWidget(self.boton_pagar)
@@ -1744,7 +1960,7 @@ class BankApp(QMainWindow):
         def procesar_pago():
             try:
                 monto_pagado = float(self.entry_monto.text())
-                metodo_pago = self.entry_metodo.text()
+                metodo_pago = self.search_metodo_combo.currentData()
 
                 if monto_pagado <= 0:
                     QMessageBox.warning(self.ventana, "Advertencia", "El monto ingresado no es válido.")
@@ -1784,17 +2000,22 @@ class BankApp(QMainWindow):
             # Calcular nuevo saldo pendiente
             saldo_pendiente -= monto_pagado
             
+            id_tipo_prestamo = self.tipo_estado_prestamo_dao.obtener_id_tipo_estado_prestamo_por_nombre(estado)
             # Actualizar el estado si el saldo es cero
             if saldo_pendiente <= 0:
                 saldo_pendiente = 0
-                estado = 'PAGADO'
+                id_tipo_prestamo = self.tipo_estado_prestamo_dao.obtener_id_tipo_estado_prestamo_por_nombre('PAGADO')
+            
+            if estado == 'MORA':
+                id_tipo_prestamo = self.tipo_estado_prestamo_dao.obtener_id_tipo_estado_prestamo_por_nombre('ACTIVO')
+
 
             fecha_pago = datetime.now()
 
             pago = PagoSqlDTO(0, id_prestamo, monto_pagado, fecha_pago, metodo_pago)
 
             # Actualizar saldo y estado del préstamo
-            if self.prestamo_dao.actualizar_saldo_y_estado_prestamo(id_prestamo, saldo_pendiente, estado):
+            if self.prestamo_dao.actualizar_saldo_y_estado_prestamo(id_prestamo, saldo_pendiente, id_tipo_prestamo):
                 # Registrar el pago
                 if self.pago_dao.registrar_pago(pago):
                     if self.usuario.rol == "EMPLEADO":
@@ -1858,6 +2079,11 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.end_date_checkbox)
         search_layout.addWidget(self.end_date_input)
 
+        self.search_tipo_combo = QComboBox()
+        self.cargar_tipo_pagos_combo()
+        search_layout.addWidget(QLabel("Tipo Pago:"))
+        search_layout.addWidget(self.search_tipo_combo)
+
         # Botón de búsqueda
         self.search_button = QPushButton("Buscar")
         self.search_button.clicked.connect(self.search_loan_payments)
@@ -1881,7 +2107,31 @@ class BankApp(QMainWindow):
         # Cargar los registros de pagos en la tabla
         self.load_loan_payments()
 
+    def cargar_tipo_pagos_combo(self):
+        tipo_pagos = self.tipo_pago_dao.cargar_todos_los_tipos_pago()
+        
+        self.search_tipo_combo.clear()
 
+        self.search_tipo_combo.addItem("")
+
+        for tipo_pago in tipo_pagos:
+            tipo_pago_id = tipo_pago.id  # Asignar el ID del cargo
+            tipo_pago_nombre = tipo_pago.nombre  # Asignar el nombre del cargo
+
+            self.search_tipo_combo.addItem(tipo_pago_nombre, tipo_pago_id)
+
+    def cargar_tipo_pagos_combo2(self):
+        tipo_pagos = self.tipo_pago_dao.cargar_todos_los_tipos_pago()
+        
+        self.search_metodo_combo.clear()
+
+        self.search_metodo_combo.addItem("Seleccione un metodo de pago")
+
+        for tipo_pago in tipo_pagos:
+            tipo_pago_id = tipo_pago.id  # Asignar el ID del cargo
+            tipo_pago_nombre = tipo_pago.nombre  # Asignar el nombre del cargo
+
+            self.search_metodo_combo.addItem(tipo_pago_nombre, tipo_pago_id)
 
     def load_loan_payments(self):
         # Obtener todos los pagos desde la base de datos
@@ -1906,9 +2156,9 @@ class BankApp(QMainWindow):
         employee_id = self.search_employee_id_input.text().strip()
         start_date = self.start_date_input.date().toPyDate() if self.start_date_checkbox.isChecked() else None
         end_date = self.end_date_input.date().toPyDate() if self.end_date_checkbox.isChecked() else None
-
+        tipo_pago = self.search_tipo_combo.currentData()
         # Buscar los pagos en base a los filtros
-        pagos = self.pago_dao.buscar_pagos(payment_id, loan_id, employee_id, start_date, end_date)
+        pagos = self.pago_dao.buscar_pagos(payment_id, loan_id, employee_id, start_date, end_date, tipo_pago)
 
         # Limpiar la tabla y cargar los resultados de búsqueda
         self.loan_payment_table.setRowCount(len(pagos))
@@ -1961,6 +2211,11 @@ class BankApp(QMainWindow):
         search_layout.addWidget(self.end_date_checkbox)
         search_layout.addWidget(self.end_date_input)
 
+        self.search_tipo_combo = QComboBox()
+        self.cargar_tipo_pagos_combo()
+        search_layout.addWidget(QLabel("Tipo Pago:"))
+        search_layout.addWidget(self.search_tipo_combo)
+
         # Botón de búsqueda
         self.search_button = QPushButton("Buscar")
         self.search_button.clicked.connect(self.search_loan_empleado_payments)
@@ -2008,9 +2263,10 @@ class BankApp(QMainWindow):
         employee_id = self.usuario.id_empleado
         start_date = self.start_date_input.date().toPyDate() if self.start_date_checkbox.isChecked() else None
         end_date = self.end_date_input.date().toPyDate() if self.end_date_checkbox.isChecked() else None
+        tipo_pago = self.search_tipo_combo.currentData()
 
         # Buscar los pagos en base a los filtros
-        pagos = self.pago_dao.buscar_pagos(payment_id, loan_id, employee_id, start_date, end_date)
+        pagos = self.pago_dao.buscar_pagos(payment_id, loan_id, employee_id, start_date, end_date, tipo_pago)
 
         # Limpiar la tabla y cargar los resultados de búsqueda
         self.loan_payment_table.setRowCount(len(pagos))
