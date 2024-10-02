@@ -3,6 +3,7 @@
 //Instalar cx_Oracle en la terminal: pip install cx_Oracle (Si da errores, deben instalar microsoft c++ build tools)
 //otra opcion es: pip install oracledb (Esta no la he probado)
 
+//Instalar PyQt5 para la GUI: pip install PyQt5
 //Instalar pandas para los reportes: pip install pandas
 //Instalar reportlab para los PDFS: pip install reportlab
 //Instalar sqlalchemy para las queries de las bases de datos con pandas: pip install sqlalchemy

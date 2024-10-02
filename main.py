@@ -1344,8 +1344,8 @@ class BankApp(QMainWindow):
             interes = solicitud.interes
 
             if new_status_str == "APROBADA":
-                if current_status != "PENDIENTE":
-                    QMessageBox.warning(self, "Error", "Solo se pueden aprobar solicitudes pendientes")
+                if current_status != "PENDIENTE" or current_status != "EN_ESTUDIO":
+                    QMessageBox.warning(self, "Error", "Solo se pueden aprobar solicitudes pendientes o en estudio")
                     return
                 # Calcular la fecha de vencimiento sumando el periodo a la fecha de aprobación
                 fecha_aprobacion = QDateTime.currentDateTime().toPyDateTime()
@@ -1377,8 +1377,8 @@ class BankApp(QMainWindow):
                 self.solicitud_prestamo_dao.actualizar_estado_solicitud(selected_request_id, new_status)
 
             elif new_status_str == "NO_APROBADA":
-                if current_status != "PENDIENTE":
-                    QMessageBox.warning(self, "Error", "Solo se pueden rechazar solicitudes pendientes")
+                if current_status != "PENDIENTE" or current_status != "EN_ESTUDIO":
+                    QMessageBox.warning(self, "Error", "Solo se pueden rechazar solicitudes pendientes o en estudio")
                     return
                 # Actualizar el estado a "NO_APROBADA"
                 self.solicitud_prestamo_dao.actualizar_estado_solicitud(selected_request_id, new_status)
@@ -2697,7 +2697,9 @@ class BankApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication([])
         # Cargar la hoja de estilos CSS
-    with open("styles.css", "r") as f:
+    css_path = os.path.join(os.path.dirname(__file__), "styles.css")
+
+    with open(css_path, "r") as f:
         stylesheet = f.read()
         app.setStyleSheet(stylesheet)
         
