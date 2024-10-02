@@ -1344,7 +1344,8 @@ class BankApp(QMainWindow):
             interes = solicitud.interes
 
             if new_status_str == "APROBADA":
-                if current_status != "PENDIENTE" or current_status != "EN_ESTUDIO":
+                print(current_status)
+                if current_status != "PENDIENTE" and current_status != "EN_ESTUDIO":
                     QMessageBox.warning(self, "Error", "Solo se pueden aprobar solicitudes pendientes o en estudio")
                     return
                 # Calcular la fecha de vencimiento sumando el periodo a la fecha de aprobación
@@ -1377,7 +1378,7 @@ class BankApp(QMainWindow):
                 self.solicitud_prestamo_dao.actualizar_estado_solicitud(selected_request_id, new_status)
 
             elif new_status_str == "NO_APROBADA":
-                if current_status != "PENDIENTE" or current_status != "EN_ESTUDIO":
+                if current_status != "PENDIENTE" and current_status != "EN_ESTUDIO":
                     QMessageBox.warning(self, "Error", "Solo se pueden rechazar solicitudes pendientes o en estudio")
                     return
                 # Actualizar el estado a "NO_APROBADA"
