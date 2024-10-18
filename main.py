@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import hashlib
 import os
 
@@ -223,14 +224,6 @@ class BankApp(QMainWindow):
         QMessageBox.information(self, "Bienvenido", "Has iniciado sesión como Empleado")
 
     def create_admin_menus(self):
-        file_menu = self.menu_bar.addMenu("Archivo")
-        exit_action = QAction("Salir", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        logout_action = QAction("Cerrar Sesión", self)
-        logout_action.triggered.connect(self.logout)
-        file_menu.addAction(logout_action)
 
         entities_menu = self.menu_bar.addMenu("Entidades")
         manage_branches_action = QAction("Gestionar Sucursales", self)
@@ -240,10 +233,6 @@ class BankApp(QMainWindow):
         manage_employees_action = QAction("Gestionar Empleados", self)
         manage_employees_action.triggered.connect(self.show_employee_management)
         entities_menu.addAction(manage_employees_action)
-
-        manage_users_action = QAction("Gestionar Usuarios", self)
-        manage_users_action.triggered.connect(self.show_user_management)
-        entities_menu.addAction(manage_users_action)
 
         manage_loans_action = QAction("Gestionar Prestamos", self)
         manage_loans_action.triggered.connect(self.show_loans_management)
@@ -267,15 +256,29 @@ class BankApp(QMainWindow):
         session_logs_action.triggered.connect(self.show_log_management)
         reports_menu.addAction(session_logs_action)
 
-    def create_treasury_menus(self):
-        file_menu = self.menu_bar.addMenu("Archivo")
+        utilidades_menu = self.menu_bar.addMenu("Utilidades")
+        manage_users_action = QAction("Gestionar Usuarios", self)
+        manage_users_action.triggered.connect(self.show_user_management)
+        utilidades_menu.addAction(manage_users_action)
+
+        calculadora_action = QAction("Calculadora", self)
+        calculadora_action.triggered.connect(self.open_calculator)
+        utilidades_menu.addAction(calculadora_action)
+
+        # Acción para abrir el calendario
+        calendario_action = QAction("Calendario", self)
+        calendario_action.triggered.connect(self.open_calendar)
+        utilidades_menu.addAction(calendario_action)
+
+        ayuda_menu = self.menu_bar.addMenu("Ayudas")
+
+        logout_menu = self.menu_bar.addMenu("Cerrar Sesión")
         exit_action = QAction("Salir", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
+        exit_action.triggered.connect(self.logout)
+        logout_menu.addAction(exit_action)
         
-        logout_action = QAction("Cerrar Sesión", self)
-        logout_action.triggered.connect(self.logout)
-        file_menu.addAction(logout_action)
+
+    def create_treasury_menus(self):
 
         entities_menu = self.menu_bar.addMenu("Entidades")
         manage_branches_action = QAction("Gestionar Sucursales", self)
@@ -299,16 +302,25 @@ class BankApp(QMainWindow):
         loan_payments_action.triggered.connect(self.show_payment_management)
         transactions_menu.addAction(loan_payments_action)
 
+        utilidades_menu = self.menu_bar.addMenu("Utilidades")
+        calculadora_action = QAction("Calculadora", self)
+        calculadora_action.triggered.connect(self.open_calculator)
+        utilidades_menu.addAction(calculadora_action)
+
+        # Acción para abrir el calendario
+        calendario_action = QAction("Calendario", self)
+        calendario_action.triggered.connect(self.open_calendar)
+        utilidades_menu.addAction(calendario_action)
+
+        ayuda_menu = self.menu_bar.addMenu("Ayudas")
+
+        logout_menu = self.menu_bar.addMenu("Cerrar Sesión")
+        exit_action = QAction("Salir", self)
+        exit_action.triggered.connect(self.logout)
+        logout_menu.addAction(exit_action)
+
 
     def create_employee_menus(self):
-        file_menu = self.menu_bar.addMenu("Archivo")
-        exit_action = QAction("Salir", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        logout_action = QAction("Cerrar Sesión", self)
-        logout_action.triggered.connect(self.logout)
-        file_menu.addAction(logout_action)
 
         entities_menu = self.menu_bar.addMenu("Entidades")
         manage_loans_action = QAction("Gestionar Prestamos", self)
@@ -323,6 +335,46 @@ class BankApp(QMainWindow):
         loan_payments_action = QAction("Pagos", self)
         loan_payments_action.triggered.connect(self.show_payment_empleado_management)
         transactions_menu.addAction(loan_payments_action)
+
+        utilidades_menu = self.menu_bar.addMenu("Utilidades")
+        calculadora_action = QAction("Calculadora", self)
+        calculadora_action.triggered.connect(self.open_calculator)
+        utilidades_menu.addAction(calculadora_action)
+
+        # Acción para abrir el calendario
+        calendario_action = QAction("Calendario", self)
+        calendario_action.triggered.connect(self.open_calendar)
+        utilidades_menu.addAction(calendario_action)
+
+        ayuda_menu = self.menu_bar.addMenu("Ayudas")
+
+        logout_menu = self.menu_bar.addMenu("Cerrar Sesión")
+        exit_action = QAction("Salir", self)
+        exit_action.triggered.connect(self.logout)
+        logout_menu.addAction(exit_action)
+
+    def open_calculator(self):
+        try:
+            # Abrir la calculadora del sistema dependiendo del SO
+            if sys.platform == "win32":  # Windows
+                subprocess.Popen("calc.exe")
+            elif sys.platform == "darwin":  # macOS
+                subprocess.Popen(["open", "-a", "Calculator"])
+            elif sys.platform.startswith("linux"):  # Linux
+                subprocess.Popen(["gnome-calculator"])
+        except Exception as e:
+            print(f"Error al abrir la calculadora: {e}")
+
+    def open_calendar(self):
+        try:
+            if sys.platform == "win32":  # Windows
+                subprocess.Popen(["start", "outlookcal:"], shell=True)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.Popen(["open", "-a", "Calendar"])
+            elif sys.platform.startswith("linux"):  # Linux
+                subprocess.Popen(["gnome-calendar"])
+        except Exception as e:
+            print(f"Error al abrir el calendario: {e}")
 
     def logout(self):
         # Registrar log de salida
